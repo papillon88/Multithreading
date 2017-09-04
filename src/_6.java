@@ -1,5 +1,6 @@
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.ArrayBlockingQueue;
 
 public class _6 {
 
@@ -10,7 +11,7 @@ public class _6 {
                 System.out.println("Produce wait : Hit Enter");
                 Scanner scanner = new Scanner(System.in);
                 scanner.nextLine();
-                wait();
+                this.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -28,7 +29,7 @@ public class _6 {
             System.out.println("Consume start");
             Scanner scanner = new Scanner(System.in);
             scanner.nextLine();
-            notify();
+            this.notify();
             try {
                 Thread.sleep(3000);
             } catch (InterruptedException e) {
