@@ -4,7 +4,7 @@ import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
 
-public class _11 {
+public class _13 {
 
     static volatile boolean canTalkWithEachOther = false;
     static Object lock = new Object();
@@ -19,7 +19,7 @@ public class _11 {
             }
             //register with coordinator
             try {
-                BufferedReader reader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\1"));
+                BufferedReader reader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\3"));
                 String[] params = reader.readLine().split(" ");
                 Socket client = new Socket(params[1], Integer.parseInt(params[2]));
                 PrintWriter out = new PrintWriter(client.getOutputStream(), true);
@@ -83,7 +83,7 @@ public class _11 {
 
         Thread t2 = new Thread(()->{
             try {
-                ServerSocket serverSocket = new ServerSocket(5554);
+                ServerSocket serverSocket = new ServerSocket(5556);
                 while(true){
                     Socket client = serverSocket.accept();
                     Thread handlerThread =  new Thread(()->{
