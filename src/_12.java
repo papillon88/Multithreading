@@ -4,14 +4,14 @@ import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
 
-public class _10 {
+public class _12 {
 
     public static void main(String[] args){
         Thread t1 = new Thread(() -> {
             Set<Neighbour> neighbours = new HashSet<>();
             try {
                 Thread.sleep(9000);
-                BufferedReader fileReader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\1"));
+                BufferedReader fileReader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\3"));
                 String lineRead;
                 while((lineRead=fileReader.readLine())!=null){
                     String[] params = lineRead.split(" ");
@@ -33,7 +33,7 @@ public class _10 {
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
                         while (true) {
-                            out.println("from 10");
+                            out.println("from 12");
                             Thread.sleep(10000);
                             //System.out.printf("from server : %s%n", in.readLine());
                         }
@@ -50,7 +50,7 @@ public class _10 {
 
         Thread t2 = new Thread(()->{
             try {
-                ServerSocket serverSocket = new ServerSocket(5554);
+                ServerSocket serverSocket = new ServerSocket(5556);
                 while(true){
                     Socket client = serverSocket.accept();
                     Thread handlerThread =  new Thread(()->{
