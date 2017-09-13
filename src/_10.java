@@ -4,10 +4,30 @@ import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
 
+
+
+//co-ordinator process
+
 public class _10 {
 
+    static volatile boolean coordinatorReadyToTalk = false;
+    static volatile boolean coordinatorReadyToListen = true;
+    static volatile int numberOfProcesses = 0;
+    static Object lock = new Object();
+
     public static void main(String[] args){
+
         Thread t1 = new Thread(() -> {
+            while (true){
+                if(coordinatorReadyToTalk)
+                    break;
+                try {
+                    Thread.sleep(400);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            System.out.println(".......starting talking process on coordinator");
             Set<Neighbour> neighbours = new HashSet<>();
             try {
                 Thread.sleep(9000);
@@ -49,10 +69,13 @@ public class _10 {
 
 
         Thread t2 = new Thread(()->{
+            coordinatorReadyToListen=true;
+            System.out.println("coordinator ready to listen..."+coordinatorReadyToListen);
             try {
-                ServerSocket serverSocket = new ServerSocket(5554);
+                ServerSocket serverSocket = new ServerSocket(5000);
                 while(true){
                     Socket client = serverSocket.accept();
+                    System.out.println("accepted by coord...");
                     Thread handlerThread =  new Thread(()->{
                         try {
                             PrintWriter out = new PrintWriter(client.getOutputStream(),true);
@@ -60,7 +83,15 @@ public class _10 {
                             String line;
                             while ((line=in.readLine())!=null){
                                 //out.println(Thread.currentThread().getName()+" "+Thread.currentThread().getId()+" : "+line);
-                                System.out.println(line);
+                                if(line.equalsIgnoreCase("register")){
+                                    synchronized (lock){
+                                        numberOfProcesses++;
+                                        System.out.println("number of processes : "+numberOfProcesses);
+                                    }
+                                    if(numberOfProcesses==3)
+                                        coordinatorReadyToTalk=true;
+                                }
+                                //System.out.println(line);
                             }
                             out.close();
                             in.close();
