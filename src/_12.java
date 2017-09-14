@@ -8,6 +8,7 @@ public class _12 {
 
     static volatile boolean canTalkWithEachOther = false;
     static Object lock = new Object();
+    static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\2";
 
     public static void main(String[] args){
 
@@ -19,11 +20,22 @@ public class _12 {
             }
             //register with coordinator
             try {
-                BufferedReader reader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\2"));
+                BufferedReader reader = new BufferedReader(new FileReader(FILE_LOCATION));
                 String[] params = reader.readLine().split(" ");
                 Socket client = new Socket(params[1], Integer.parseInt(params[2]));
                 PrintWriter out = new PrintWriter(client.getOutputStream(), true);
+                BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+                System.out.println("registration initiated");
                 out.println("register");
+                String line;
+                while ((line=in.readLine())!=null){
+                    if(line.equals("registered")) {
+                        System.out.println("registration success");
+                        synchronized (lock){
+                            canTalkWithEachOther=true;
+                        }
+                    }
+                }
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -44,8 +56,9 @@ public class _12 {
             Set<Neighbour> neighbours = new HashSet<>();
             try {
                 Thread.sleep(9000);
-                BufferedReader fileReader = new BufferedReader(new FileReader("C:\\Users\\papillon\\Desktop\\Multithreading\\src\\1"));
+                BufferedReader fileReader = new BufferedReader(new FileReader(FILE_LOCATION));
                 String lineRead;
+                fileReader.readLine();
                 while((lineRead=fileReader.readLine())!=null){
                     String[] params = lineRead.split(" ");
                     Neighbour neighbour = new Neighbour(params[0],params[1]);
@@ -66,7 +79,7 @@ public class _12 {
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
                         while (true) {
-                            out.println("from 10");
+                            out.println("from 12");
                             Thread.sleep(10000);
                             //System.out.printf("from server : %s%n", in.readLine());
                         }
@@ -93,12 +106,12 @@ public class _12 {
                             String line;
                             while ((line=in.readLine())!=null){
                                 //out.println(Thread.currentThread().getName()+" "+Thread.currentThread().getId()+" : "+line);
-                                if(line.equalsIgnoreCase("registered")){
+                                /*if(line.equalsIgnoreCase("registered")){
                                     synchronized (lock){
                                         canTalkWithEachOther=true;
                                     }
-                                }
-                                //System.out.println(line);
+                                }*/
+                                System.out.println(line);
                             }
                             out.close();
                             in.close();
