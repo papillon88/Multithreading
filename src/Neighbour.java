@@ -1,10 +1,17 @@
 public class Neighbour {
+    private int id;
     private String hostname;
     private String portnum;
 
     public Neighbour(){}
 
     public Neighbour(String hostname, String portnum) {
+        this.hostname = hostname;
+        this.portnum = portnum;
+    }
+
+    public Neighbour(int id, String hostname, String portnum) {
+        this.id = id;
         this.hostname = hostname;
         this.portnum = portnum;
     }
