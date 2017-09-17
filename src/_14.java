@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-public class _12 {
+public class _14 {
 
     static volatile boolean canSendHello = false;
     static volatile boolean canSendReady = true;
@@ -15,7 +15,7 @@ public class _12 {
     static volatile int numberOfNeighbours = 0;
     static volatile int neighbourCounter = 0;
     static Object lock = new Object();
-    static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\2";
+    static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\4";
 
     public static void main(String[] args){
 
@@ -104,7 +104,7 @@ public class _12 {
                         out.println("hello");
                         while(true) {
                             if(canSendCompute){
-                                out.println("from 12");
+                                out.println("from 14");
                                 Thread.sleep(10000);
                             }
                             Thread.sleep(900);
@@ -122,7 +122,7 @@ public class _12 {
 
         Thread t2 = new Thread(()->{
             try {
-                ServerSocket serverSocket = new ServerSocket(5555);
+                ServerSocket serverSocket = new ServerSocket(5557);
                 while(true){
                     Socket client = serverSocket.accept();
                     Thread handlerThread =  new Thread(()->{

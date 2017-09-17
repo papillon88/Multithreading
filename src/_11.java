@@ -3,10 +3,17 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class _11 {
 
-    static volatile boolean canTalkWithEachOther = false;
+    static volatile boolean canSendHello = false;
+    static volatile boolean canSendReady = true;
+    static volatile boolean canSendCompute = false;
+    static BlockingQueue<Integer> blockingQueue = new ArrayBlockingQueue<>(1);
+    static volatile int numberOfNeighbours = 0;
+    static volatile int neighbourCounter = 0;
     static Object lock = new Object();
     static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\1";
 
@@ -14,7 +21,7 @@ public class _11 {
 
         Thread t0 = new Thread(()->{
             try {
-                Thread.sleep(2000);
+                Thread.sleep(200);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -32,7 +39,22 @@ public class _11 {
                     if(line.equals("registered")) {
                         System.out.println("registration success");
                         synchronized (lock){
-                            canTalkWithEachOther=true;
+                            canSendHello=true;
+                        }
+                    }
+                    while(true){
+                        if(!blockingQueue.isEmpty())
+                            break;
+                    }
+                    if(canSendReady){
+                        System.out.println("sending ready to coord");
+                        out.println("ready");
+                        canSendReady=false;
+                    }
+                    if(line.equals("compute")) {
+                        System.out.println("computation starting...");
+                        synchronized (lock){
+                            canSendCompute=true;
                         }
                     }
                 }
@@ -44,18 +66,18 @@ public class _11 {
         });
 
         Thread t1 = new Thread(() -> {
-            while (true){
-                if(canTalkWithEachOther)
+            while(true){
+                if(canSendHello)
                     break;
                 try {
-                    Thread.sleep(400);
+                    Thread.sleep(900);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
             Set<Neighbour> neighbours = new HashSet<>();
             try {
-                Thread.sleep(9000);
+                Thread.sleep(900);
                 BufferedReader fileReader = new BufferedReader(new FileReader(FILE_LOCATION));
                 String lineRead;
                 fileReader.readLine();
@@ -63,6 +85,7 @@ public class _11 {
                     String[] params = lineRead.split(" ");
                     Neighbour neighbour = new Neighbour(params[0],params[1]);
                     neighbours.add(neighbour);
+                    numberOfNeighbours++;
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -78,9 +101,13 @@ public class _11 {
                         PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-                        while (true) {
-                            out.println("from 11");
-                            Thread.sleep(10000);
+                        out.println("hello");
+                        while(true) {
+                            if(canSendCompute){
+                                out.println("from 11");
+                                Thread.sleep(10000);
+                            }
+                            Thread.sleep(900);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -104,7 +131,16 @@ public class _11 {
                             BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                             String line;
                             while ((line=in.readLine())!=null){
-                                System.out.println(line);
+                                if(line.equalsIgnoreCase("hello")){
+                                    System.out.println(line);
+                                    synchronized (lock){
+                                        neighbourCounter++;
+                                    }
+                                    if(neighbourCounter==numberOfNeighbours)
+                                        blockingQueue.add(1);
+                                } else {
+                                    System.out.println(line);
+                                }
                             }
                             out.close();
                             in.close();
