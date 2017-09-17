@@ -1,7 +1,9 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -10,11 +12,17 @@ import java.util.Set;
 
 public class _10 {
 
-    static final int NUMBER_OF_PROCS = 3;
-    static volatile int numberOfProcesses = 0;
+    static int NUMBER_OF_PROCS ;
+    static volatile int numberOfProcessRegistered = 0;
+    static volatile int numberOfProcessReady = 0;
     static Object lock = new Object();
+    static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\dsConfig";
+    static Map<Integer,Set<Neighbour>> neighbours = new HashMap<>();
+    static int ID;
 
     public static void main(String[] args){
+
+        runConfiguration(FILE_LOCATION);
 
         Thread t = new Thread(()->{
             System.out.println("Coordinator process initiated");
@@ -32,21 +40,40 @@ public class _10 {
                             while ((line=in.readLine())!=null){
                                 if(line.equalsIgnoreCase("register")){
                                     synchronized (lock){
-                                        numberOfProcesses++;
-                                        System.out.println("number of processes registered with coordinator so far : "+numberOfProcesses);
+                                        numberOfProcessRegistered++;
+                                        System.out.println("number of processes registered with coordinator so far : "+numberOfProcessRegistered);
                                     }
                                     while (true){
-                                        if(numberOfProcesses==NUMBER_OF_PROCS){
+                                        if(numberOfProcessRegistered==NUMBER_OF_PROCS){
                                             break;
                                         }
                                     }
+                                    Thread.sleep(200);
+                                    //modify below code to apprise the clients about their host id and neighbours
                                     out.println("registered");
+                                }
+                                if(line.equalsIgnoreCase("ready")){
+                                    synchronized (lock){
+                                        numberOfProcessReady++;
+                                        System.out.println("number of processes ready so far : "+numberOfProcessReady);
+                                    }
+                                    while (true){
+                                        if(numberOfProcessReady==NUMBER_OF_PROCS){
+                                            break;
+                                        }
+                                    }
+                                    Thread.sleep(200);
+                                    //modify below code to apprise the clients about their host id and neighbours
+                                    System.out.println("sending compute to "+client.getInetAddress().getHostName());
+                                    out.println("compute");
                                 }
                             }
                             out.close();
                             in.close();
                             client.close();
                         } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
                     });
@@ -62,6 +89,32 @@ public class _10 {
         try {
             t.join();
         } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void runConfiguration(String fileLocation) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(fileLocation));
+            String line;
+            while ((line=reader.readLine())!=null){
+                String[] parsedLines = line.split(" ");
+                if(parsedLines[0].equalsIgnoreCase("COORDINATOR"))
+                    continue;
+                if(parsedLines[0].equalsIgnoreCase("NUMBER")){
+                    NUMBER_OF_PROCS=Integer.parseInt(parsedLines[3]);
+                }
+                if(parsedLines[0].equalsIgnoreCase("INTERVAL"))
+                    continue;
+                if(parsedLines[0].equalsIgnoreCase("TERMINATE"))
+                    continue;
+                if(parsedLines[0].equalsIgnoreCase("NEIGHBOR")){
+                    continue;
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
