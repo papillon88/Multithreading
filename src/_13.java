@@ -16,6 +16,8 @@ public class _13 {
     static volatile int neighbourCounter = 0;
     static Object lock = new Object();
     static final String FILE_LOCATION = "C:\\Users\\papillon\\Desktop\\Multithreading\\src\\3";
+    static Set<Neighbour> neighbours = new HashSet<>();
+    static int PROCESSID;
 
     public static void main(String[] args){
 
@@ -36,8 +38,15 @@ public class _13 {
                 out.println("register");
                 String line;
                 while ((line=in.readLine())!=null){
-                    if(line.equals("registered")) {
+                    String[] parsedReceivedLine = line.split(",");
+                    if(parsedReceivedLine[0].equals("registered")) {
                         System.out.println("registration success");
+                        PROCESSID=Integer.parseInt(parsedReceivedLine[1]);
+                        for(int i=2;i<parsedReceivedLine.length;i++){
+                            String[] neighboursToBeConfigured = parsedReceivedLine[i].split(":");
+                            //neighbours.add(new Neighbour(neighboursToBeConfigured[0],neighboursToBeConfigured[1]));
+                            System.out.println(parsedReceivedLine[i]);
+                        }
                         synchronized (lock){
                             canSendHello=true;
                         }
@@ -75,7 +84,7 @@ public class _13 {
                     e.printStackTrace();
                 }
             }
-            Set<Neighbour> neighbours = new HashSet<>();
+
             try {
                 Thread.sleep(900);
                 BufferedReader fileReader = new BufferedReader(new FileReader(FILE_LOCATION));
@@ -122,7 +131,7 @@ public class _13 {
 
         Thread t2 = new Thread(()->{
             try {
-                ServerSocket serverSocket = new ServerSocket(5556);
+                ServerSocket serverSocket = new ServerSocket(5557);
                 while(true){
                     Socket client = serverSocket.accept();
                     Thread handlerThread =  new Thread(()->{

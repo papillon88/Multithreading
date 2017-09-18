@@ -5,6 +5,14 @@ public class Neighbour {
 
     public Neighbour(){}
 
+    public Neighbour(String hostname,int id){
+        this.hostname=hostname;
+        this.id=id;
+    }
+
+    public Neighbour(String hostname){
+        this.hostname=hostname;
+    }
     public Neighbour(String hostname, String portnum) {
         this.hostname = hostname;
         this.portnum = portnum;
@@ -30,5 +38,9 @@ public class Neighbour {
 
     public void setPortnum(String portnum) {
         this.portnum = portnum;
+    }
+
+    public int getId() {
+        return id;
     }
 }
