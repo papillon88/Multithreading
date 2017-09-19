@@ -96,6 +96,7 @@ public class _10 {
                                     System.out.println("sending compute to "+client.getInetAddress().getHostName());
                                     out.println("compute");
                                 }
+
                             }
                             out.close();
                             in.close();

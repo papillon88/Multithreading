@@ -12,6 +12,10 @@ import java.util.concurrent.BlockingQueue;
 
 public class deploy {
 
+    //CLOCK
+    static volatile int llc_value= 0;
+    static Object llc_lock = new Object();
+
     //COORDINATOR PROCESS PARAMS
     static int NUMBER_OF_PROCS;
     static volatile int numberOfProcessRegistered = 0;
@@ -41,14 +45,13 @@ public class deploy {
 
                 Thread coordinatorThread = new Thread(() -> {
                     System.out.println();
-                    System.out.println("********Coordinator process initiated");
-                    System.out.println("********Waiting for processes to register...");
+                    System.out.println("<i> ********Coordinator process initiated");
+                    System.out.println("<i> ********Waiting for processes to register...");
                     System.out.println();
                     try {
-                        ServerSocket serverSocket = new ServerSocket(5001);
+                        ServerSocket serverSocket = new ServerSocket(5002);
                         while (true) {
                             Socket client = serverSocket.accept();
-                            System.out.println("********Register request received from "+client.getInetAddress().getHostName());
                             Thread handlerThread = new Thread(() -> {
                                 try {
                                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
@@ -56,13 +59,19 @@ public class deploy {
                                     String line;
                                     int pid;
                                     while ((line = in.readLine()) != null) {
-                                        if (line.equalsIgnoreCase("register")) {
+                                        String[] lineRecvdByCoord = line.split(",");
+                                        if (lineRecvdByCoord[1].equalsIgnoreCase("register")) {
                                             synchronized (coordinatorLock) {
                                                 numberOfProcessRegistered++;
                                                 pid = numberOfProcessRegistered;
                                                 pidToHostnameMap.put(pid,
                                                         new Neighbour(String.valueOf(client.getInetAddress().getHostName()),pid));
-                                                System.out.println("********number of processes registered with coordinator so far : " + numberOfProcessRegistered);
+                                                synchronized (llc_lock){
+                                                    int senderProcTS = Integer.parseInt(lineRecvdByCoord[0]);
+                                                    int maxOfTS = Math.max(senderProcTS,llc_value);
+                                                    llc_value=maxOfTS+1;
+                                                    System.out.printf("<%d> ********register frm : %s , # of procs registered : %d%n",llc_value,client.getInetAddress().getHostName(),numberOfProcessRegistered);
+                                                }
                                             }
                                             while (true) {
                                                 if (numberOfProcessRegistered == NUMBER_OF_PROCS) {
@@ -80,13 +89,21 @@ public class deploy {
                                                 Neighbour neighbour = pidToHostnameMap.get(i);
                                                 stringBuilder.append(neighbour.getHostname()+" "+neighbour.getId());
                                             }
-                                            System.out.println("********sending registered to " + client.getInetAddress().getHostName());
-                                            out.println("registered," + stringBuilder.toString());
+                                            synchronized (llc_lock){
+                                                llc_value++;
+                                                out.println(llc_value+",registered," + stringBuilder.toString());
+                                                System.out.printf("<%d> ********sending registered to %s%n",llc_value,client.getInetAddress().getHostName());
+                                            }
                                         }
-                                        if (line.equalsIgnoreCase("ready")) {
+                                        if (lineRecvdByCoord[1].equalsIgnoreCase("ready")) {
                                             synchronized (coordinatorLock) {
                                                 numberOfProcessReady++;
-                                                System.out.println("********number of processes ready so far : " + numberOfProcessReady);
+                                                synchronized (llc_lock){
+                                                    int senderProcTS = Integer.parseInt(lineRecvdByCoord[0]);
+                                                    int maxOfTS = Math.max(senderProcTS,llc_value);
+                                                    llc_value=maxOfTS+1;
+                                                    System.out.printf("<%d> ********ready frm : %s , # of procs ready : %d%n",llc_value,client.getInetAddress().getHostName(),numberOfProcessReady);
+                                                }
                                             }
                                             while (true) {
                                                 if (numberOfProcessReady == NUMBER_OF_PROCS) {
@@ -96,8 +113,11 @@ public class deploy {
                                             System.out.println();
                                             Thread.sleep(200);
                                             //modify below code to apprise the clients about their host id and neighbours
-                                            System.out.println("********sending compute to " + client.getInetAddress().getHostName());
-                                            out.println("compute");
+                                            synchronized (llc_lock){
+                                                llc_value++;
+                                                System.out.printf("<%d> ********sending compute to %s%n",llc_value,client.getInetAddress().getHostName());
+                                                out.println(llc_value+",compute");
+                                            }
                                         }
                                     }
                                     out.close();
@@ -113,7 +133,7 @@ public class deploy {
                             //handlerThread.join();
                         }
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        System.out.println(e.getMessage());
                     }
                 });
                 coordinatorThread.start();
@@ -134,29 +154,37 @@ public class deploy {
                 Socket client = new Socket(params[1], 5001);
                 PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
-                System.out.println();
-                System.out.println("registration initiated");
-                System.out.println();
-                out.println("register");
+                synchronized (llc_lock){
+                    llc_value++;
+                    out.println(llc_value+",register");
+                    System.out.println();
+                    System.out.printf("<%d> registration initiated%n",llc_value);
+                    System.out.println();
+                }
                 String line;
                 while ((line = in.readLine()) != null) {
                     String[] parsedReceivedLine = line.split(",");
-                    if (parsedReceivedLine[0].equals("registered")) {
+                    if (parsedReceivedLine[1].equals("registered")) {
                         System.out.println();
-                        System.out.println("registration success");
+                        System.out.println("<i> registration success");
                         System.out.println();
-                        System.out.println("received PID and neighbour list from coordinator");
-                        PROCESSID = Integer.parseInt(parsedReceivedLine[1]);
-                        System.out.println("PID ====== "+PROCESSID);
-                        System.out.println("Neighbours =========PID");
-                        for (int i = 2; i < parsedReceivedLine.length; i++) {
-                            String[] detailsOfNeighbour = parsedReceivedLine[i].split(" ");
-                            localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0]));
-                            numberOfNeighbours++;
-                            System.out.println(detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
+                        synchronized (llc_lock){
+                            int senderProcTS = Integer.parseInt(parsedReceivedLine[0]);
+                            int maxOfTS = Math.max(senderProcTS,llc_value);
+                            llc_value=maxOfTS+1;
+                            System.out.printf("<%d> received PID and neighbour list from coordinator%n",llc_value);
+                            PROCESSID = Integer.parseInt(parsedReceivedLine[2]);
+                            System.out.printf("<%d>PID ====== %d%n",llc_value,PROCESSID);
+                            System.out.printf("<%d>Neighbours =========PID%n",llc_value);
+                            for (int i = 3; i < parsedReceivedLine.length; i++) {
+                                String[] detailsOfNeighbour = parsedReceivedLine[i].split(" ");
+                                localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0]));
+                                numberOfNeighbours++;
+                                System.out.println(detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
+                            }
+                            System.out.println("===========================");
+                            System.out.println();
                         }
-                        System.out.println("=======================");
-                        System.out.println();
                         synchronized (lock) {
                             canSendHello = true;
                         }
@@ -166,17 +194,25 @@ public class deploy {
                             break;
                     }
                     if (canSendReady) {
-                        System.out.println();
-                        System.out.println("sending ready to coordinator");
-                        System.out.println();
-                        out.println("ready");
+                        synchronized (llc_lock){
+                            llc_value++;
+                            System.out.println();
+                            System.out.printf("<%d> sending ready to coordinator%n",llc_value);
+                            System.out.println();
+                            out.println(llc_value+",ready");
+                        }
                         canSendReady = false;
                     }
-                    if (line.equals("compute")) {
-                        System.out.println();
-                        System.out.println("received compute from coordinator");
-                        System.out.println();
+                    if (parsedReceivedLine[1].equals("compute")) {
                         synchronized (lock) {
+                            synchronized (llc_lock){
+                                int senderProcTS = Integer.parseInt(parsedReceivedLine[0]);
+                                int maxOfTS = Math.max(senderProcTS,llc_value);
+                                llc_value=maxOfTS+1;
+                                System.out.println();
+                                System.out.printf("<%d> received compute from coordinator%n",llc_value);
+                                System.out.println();
+                            }
                             canSendCompute = true;
                         }
                     }
@@ -208,10 +244,17 @@ public class deploy {
                         PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-                        out.println("hello from PID "+PROCESSID);
+                        synchronized (llc_lock){
+                            llc_value++;
+                            out.println(llc_value+" hello from PID "+PROCESSID);
+                            System.out.printf("<%d> sending hello to PID %d%n",llc_value,n.getId());
+                        }
                         while (true) {
                             if (canSendCompute) {
-                                out.println("compute from PID " + PROCESSID);
+                                synchronized (llc_lock){
+                                    llc_value++;
+                                    out.println(llc_value+" compute from PID " + PROCESSID);
+                                }
                                 Thread.sleep(10000);
                             }
                             Thread.sleep(900);
@@ -239,15 +282,25 @@ public class deploy {
                             String line;
                             while ((line = in.readLine()) != null) {
                                 String[] parsedLine = line.split(" ");
-                                if (parsedLine[0].equalsIgnoreCase("hello")) {
-                                    System.out.println(line);
+                                if (parsedLine[1].equalsIgnoreCase("hello")) {
+                                    synchronized (llc_lock){
+                                        int senderProcTS = Integer.parseInt(parsedLine[0]);
+                                        int maxOfTS = Math.max(senderProcTS,llc_value);
+                                        llc_value=maxOfTS+1;
+                                        System.out.printf("<%d> received hello from PID %d%n",llc_value,parsedLine[parsedLine.length-1]);
+                                    }
                                     synchronized (lock) {
                                         neighbourCounter++;
                                     }
                                     if (neighbourCounter == numberOfNeighbours)
                                         blockingQueue.add(1);
                                 } else {
-                                    System.out.println(line);
+                                    synchronized (llc_lock){
+                                        int senderProcTS = Integer.parseInt(parsedLine[0]);
+                                        int maxOfTS = Math.max(senderProcTS,llc_value);
+                                        llc_value=maxOfTS+1;
+                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,parsedLine[parsedLine.length-1]);
+                                    }
                                 }
                             }
                             out.close();
@@ -315,8 +368,7 @@ public class deploy {
     }
 }
 
-/*
-class Neighbour {
+/*class Neighbour {
     private int id;
     private String hostname;
     private String portnum;
@@ -361,5 +413,4 @@ class Neighbour {
     public int getId() {
         return id;
     }
-}
-*/
+}*/
