@@ -1,12 +1,7 @@
-
-
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -35,6 +30,8 @@ public class deploy {
     static volatile int neighbourCounter = 0;
     static Object lock = new Object();
     static Set<Neighbour> localNeighbourSet = new HashSet<>();
+    static volatile List<Integer> sendArray;
+    static volatile List<Integer> recvArray;
 
     public static void main(String[] args) {
 
@@ -53,6 +50,11 @@ public class deploy {
                         while (true) {
                             Socket client = serverSocket.accept();
                             Thread handlerThread = new Thread(() -> {
+                                Thread clThread = new Thread(()->{
+                                    //keep a track of llc_value. initiate CLA every 100 llc_value
+                                });
+                                clThread.start();
+
                                 try {
                                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                                     BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
@@ -161,6 +163,7 @@ public class deploy {
                     System.out.printf("<%d> registration initiated%n",llc_value);
                     System.out.println();
                 }
+
                 String line;
                 while ((line = in.readLine()) != null) {
                     String[] parsedReceivedLine = line.split(",");
@@ -178,7 +181,7 @@ public class deploy {
                             System.out.printf("    Neighbours----------PID%n");
                             for (int i = 3; i < parsedReceivedLine.length; i++) {
                                 String[] detailsOfNeighbour = parsedReceivedLine[i].split(" ");
-                                localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0]));
+                                localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0],Integer.parseInt(detailsOfNeighbour[1])));
                                 numberOfNeighbours++;
                                 System.out.println("    "+detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
                             }
