@@ -49,7 +49,7 @@ public class deploy {
                     System.out.println("<i> ********Waiting for processes to register...");
                     System.out.println();
                     try {
-                        ServerSocket serverSocket = new ServerSocket(5002);
+                        ServerSocket serverSocket = new ServerSocket(5001);
                         while (true) {
                             Socket client = serverSocket.accept();
                             Thread handlerThread = new Thread(() -> {
@@ -174,15 +174,15 @@ public class deploy {
                             llc_value=maxOfTS+1;
                             System.out.printf("<%d> received PID and neighbour list from coordinator%n",llc_value);
                             PROCESSID = Integer.parseInt(parsedReceivedLine[2]);
-                            System.out.printf("<%d>PID ====== %d%n",llc_value,PROCESSID);
-                            System.out.printf("<%d>Neighbours =========PID%n",llc_value);
+                            System.out.printf("    PID : %d%n",PROCESSID);
+                            System.out.printf("    Neighbours----------PID%n");
                             for (int i = 3; i < parsedReceivedLine.length; i++) {
                                 String[] detailsOfNeighbour = parsedReceivedLine[i].split(" ");
                                 localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0]));
                                 numberOfNeighbours++;
-                                System.out.println(detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
+                                System.out.println("    "+detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
                             }
-                            System.out.println("===========================");
+                            System.out.println("    -----------------------");
                             System.out.println();
                         }
                         synchronized (lock) {
@@ -287,7 +287,7 @@ public class deploy {
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
-                                        System.out.printf("<%d> received hello from PID %d%n",llc_value,parsedLine[parsedLine.length-1]);
+                                        System.out.printf("<%d> received hello from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                     synchronized (lock) {
                                         neighbourCounter++;
@@ -299,7 +299,7 @@ public class deploy {
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
-                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,parsedLine[parsedLine.length-1]);
+                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                 }
                             }
@@ -368,7 +368,8 @@ public class deploy {
     }
 }
 
-/*class Neighbour {
+/*
+class Neighbour {
     private int id;
     private String hostname;
     private String portnum;
@@ -413,4 +414,5 @@ public class deploy {
     public int getId() {
         return id;
     }
-}*/
+}
+*/
