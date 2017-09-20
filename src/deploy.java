@@ -30,8 +30,8 @@ public class deploy {
     static volatile int neighbourCounter = 0;
     static Object lock = new Object();
     static Set<Neighbour> localNeighbourSet = new HashSet<>();
-    static volatile List<Integer> sendArray;
-    static volatile List<Integer> recvArray;
+    static volatile int[] sendArray;
+    static volatile int[] recvArray;
 
     public static void main(String[] args) {
 
@@ -164,6 +164,11 @@ public class deploy {
                     System.out.println();
                 }
 
+                String[] totalNumberOfProcs = reader.readLine().split(" ");
+                int arraySize = Integer.parseInt(totalNumberOfProcs[3]);
+                sendArray = new int[arraySize];
+                recvArray = new int[arraySize];
+
                 String line;
                 while ((line = in.readLine()) != null) {
                     String[] parsedReceivedLine = line.split(",");
@@ -249,6 +254,7 @@ public class deploy {
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
                         synchronized (llc_lock){
                             llc_value++;
+                            sendArray[n.getId()-1]++;
                             out.println(llc_value+" hello from PID "+PROCESSID);
                             System.out.printf("<%d> sending hello to PID %d%n",llc_value,n.getId());
                         }
@@ -256,6 +262,7 @@ public class deploy {
                             if (canSendCompute) {
                                 synchronized (llc_lock){
                                     llc_value++;
+                                    sendArray[n.getId()-1]++;
                                     out.println(llc_value+" compute from PID " + PROCESSID);
                                 }
                                 Thread.sleep(10000);
@@ -290,6 +297,7 @@ public class deploy {
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
+                                        recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
                                         System.out.printf("<%d> received hello from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                     synchronized (lock) {
@@ -302,6 +310,21 @@ public class deploy {
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
+                                        recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
+                                        //for debugging send and recv arrays
+                                        /*if(llc_value>100){
+                                            //print send and recv array
+                                            System.out.println("SEND ARRAY");
+                                            for(int i : sendArray){
+                                                System.out.printf("%d ",i);
+                                            }
+                                            System.out.println();
+                                            System.out.println("RECV ARRAY");
+                                            for(int i : recvArray){
+                                                System.out.printf("%d ",i);
+                                            }
+                                            System.out.println();
+                                        }*/
                                         System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                 }
