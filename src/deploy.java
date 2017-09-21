@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
@@ -11,6 +12,14 @@ public class deploy {
     static volatile int llc_value= 0;
     static Object llc_lock = new Object();
 
+    //MARKER
+    static volatile boolean forwardMarker = false;
+    static Object markerLock = new Object();
+    static volatile boolean firstMarkerReceived = false;
+    static volatile int resetMarkerCounter = 0;
+    static Object yetAnotherMarkerLock = new Object();
+    static volatile int neighbourMarkerCounter = 0;
+
     //COORDINATOR PROCESS PARAMS
     static int NUMBER_OF_PROCS;
     static volatile int numberOfProcessRegistered = 0;
@@ -20,6 +29,10 @@ public class deploy {
     static Map<Integer, Set<Integer>> neighbours = new HashMap<>();
     static Map<Integer, Neighbour> pidToHostnameMap = new HashMap<>();
     static int PROCESSID;
+    static int INTERVAL;
+    static int TERMINATE;
+    static boolean coordinator = false;
+
 
     //NON COORDINATOR PROCESS PARAMS
     static volatile boolean canSendHello = false;
@@ -32,12 +45,14 @@ public class deploy {
     static Set<Neighbour> localNeighbourSet = new HashSet<>();
     static volatile int[] sendArray;
     static volatile int[] recvArray;
+    static volatile int[] chnlArray;
 
     public static void main(String[] args) {
 
         if (args.length != 0) {
             if (args[0].equalsIgnoreCase("-c")) {
                 //Running the coordinator part of the process
+                coordinator = true;
                 runConfiguration(CONFIG);
 
                 Thread coordinatorThread = new Thread(() -> {
@@ -49,12 +64,7 @@ public class deploy {
                         ServerSocket serverSocket = new ServerSocket(5001);
                         while (true) {
                             Socket client = serverSocket.accept();
-                            Thread handlerThread = new Thread(() -> {
-                                Thread clThread = new Thread(()->{
-                                    //keep a track of llc_value. initiate CLA every 100 llc_value
-                                });
-                                clThread.start();
-
+                            Thread coordinatorAncillary = new Thread(() -> {
                                 try {
                                     PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                                     BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
@@ -89,7 +99,7 @@ public class deploy {
                                             for (Integer i : tempSet) {
                                                 stringBuilder.append(",");
                                                 Neighbour neighbour = pidToHostnameMap.get(i);
-                                                stringBuilder.append(neighbour.getHostname()+" "+neighbour.getId());
+                                                stringBuilder.append(neighbour.getHostname()+":"+neighbour.getId());
                                             }
                                             synchronized (llc_lock){
                                                 llc_value++;
@@ -104,7 +114,7 @@ public class deploy {
                                                     int senderProcTS = Integer.parseInt(lineRecvdByCoord[0]);
                                                     int maxOfTS = Math.max(senderProcTS,llc_value);
                                                     llc_value=maxOfTS+1;
-                                                    System.out.printf("<%d> ********ready frm : %s , # of procs ready : %d%n",llc_value,client.getInetAddress().getHostName(),numberOfProcessReady);
+                                                    System.out.printf("<%d> ********ready frm PID# : %s , # of procs ready : %d%n",llc_value,lineRecvdByCoord[2],numberOfProcessReady);
                                                 }
                                             }
                                             while (true) {
@@ -118,7 +128,7 @@ public class deploy {
                                             synchronized (llc_lock){
                                                 llc_value++;
                                                 System.out.printf("<%d> ********sending compute to %s%n",llc_value,client.getInetAddress().getHostName());
-                                                out.println(llc_value+",compute");
+                                                out.println(llc_value+",compute,"+PROCESSID);
                                             }
                                         }
                                     }
@@ -131,7 +141,7 @@ public class deploy {
                                     e.printStackTrace();
                                 }
                             });
-                            handlerThread.start();
+                            coordinatorAncillary.start();
                             //handlerThread.join();
                         }
                     } catch (IOException e) {
@@ -139,8 +149,31 @@ public class deploy {
                     }
                 });
                 coordinatorThread.start();
+
+
+                Thread chandyLamportInit = new Thread(()->{
+                    while (true){
+                        if(llc_value>100)
+                            break;
+                    }
+                    System.out.println("SEND : "+Arrays.toString(sendArray));
+                    System.out.println("RECV : "+Arrays.toString(recvArray));
+                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    forwardMarker=true;
+
+                    while (true){
+                        if(llc_value>300)
+                            break;
+                    }
+                    System.out.println("SEND : "+Arrays.toString(sendArray));
+                    System.out.println("RECV : "+Arrays.toString(recvArray));
+                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    forwardMarker=true;
+                });
+                chandyLamportInit.start();
             }
         }
+
 
         //Running the non coordinator part of the process
         Thread initializingThread = new Thread(() -> {
@@ -168,6 +201,7 @@ public class deploy {
                 int arraySize = Integer.parseInt(totalNumberOfProcs[3]);
                 sendArray = new int[arraySize];
                 recvArray = new int[arraySize];
+                chnlArray = new int[arraySize];
 
                 String line;
                 while ((line = in.readLine()) != null) {
@@ -185,7 +219,7 @@ public class deploy {
                             System.out.printf("    PID : %d%n",PROCESSID);
                             System.out.printf("    Neighbours----------PID%n");
                             for (int i = 3; i < parsedReceivedLine.length; i++) {
-                                String[] detailsOfNeighbour = parsedReceivedLine[i].split(" ");
+                                String[] detailsOfNeighbour = parsedReceivedLine[i].split(":");
                                 localNeighbourSet.add(new Neighbour(detailsOfNeighbour[0],Integer.parseInt(detailsOfNeighbour[1])));
                                 numberOfNeighbours++;
                                 System.out.println("    "+detailsOfNeighbour[0]+"   "+detailsOfNeighbour[1]);
@@ -207,7 +241,7 @@ public class deploy {
                             System.out.println();
                             System.out.printf("<%d> sending ready to coordinator%n",llc_value);
                             System.out.println();
-                            out.println(llc_value+",ready");
+                            out.println(llc_value+",ready,"+PROCESSID);
                         }
                         canSendReady = false;
                     }
@@ -218,7 +252,7 @@ public class deploy {
                                 int maxOfTS = Math.max(senderProcTS,llc_value);
                                 llc_value=maxOfTS+1;
                                 System.out.println();
-                                System.out.printf("<%d> received compute from coordinator%n",llc_value);
+                                System.out.printf("<%d> received compute from coordinator(PID#%s)%n",llc_value,parsedReceivedLine[2]);
                                 System.out.println();
                             }
                             canSendCompute = true;
@@ -255,19 +289,42 @@ public class deploy {
                         synchronized (llc_lock){
                             llc_value++;
                             sendArray[n.getId()-1]++;
-                            out.println(llc_value+" hello from PID "+PROCESSID);
+                            out.println(llc_value+",hello,"+PROCESSID);
                             System.out.printf("<%d> sending hello to PID %d%n",llc_value,n.getId());
                         }
+
+                        Thread forwardMarkerThread = new Thread(()->{
+                            while (true){
+                                if(forwardMarker){
+                                    out.println(llc_value+",marker,"+PROCESSID);
+                                    System.out.println("FORWARDED MARKER");
+                                    synchronized (yetAnotherMarkerLock){
+                                        resetMarkerCounter++;
+                                        System.out.println("!!!!!!!!!RESET!!!!!!"+resetMarkerCounter);
+                                        System.out.println("!!!!!!!!!NEIGH!!!!!"+numberOfNeighbours);
+                                    }
+                                    while (true){
+                                        if(resetMarkerCounter%numberOfNeighbours==0){
+                                            forwardMarker = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        forwardMarkerThread.start();
+
+
                         while (true) {
                             if (canSendCompute) {
                                 synchronized (llc_lock){
                                     llc_value++;
                                     sendArray[n.getId()-1]++;
-                                    out.println(llc_value+" compute from PID " + PROCESSID);
+                                    out.println(llc_value+",compute," + PROCESSID);
                                 }
-                                Thread.sleep(10000);
+                                //Thread.sleep(500);
                             }
-                            Thread.sleep(900);
+                            Thread.sleep(200);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -291,42 +348,78 @@ public class deploy {
                             BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                             String line;
                             while ((line = in.readLine()) != null) {
-                                String[] parsedLine = line.split(" ");
+                                String[] parsedLine = line.split(",");
                                 if (parsedLine[1].equalsIgnoreCase("hello")) {
                                     synchronized (llc_lock){
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
-                                        recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
-                                        System.out.printf("<%d> received hello from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
+                                        recvArray[Integer.parseInt(parsedLine[2])-1]++;
+                                        System.out.printf("<%d> received hello from PID %d%n",llc_value,Integer.parseInt(parsedLine[2]));
                                     }
                                     synchronized (lock) {
                                         neighbourCounter++;
                                     }
                                     if (neighbourCounter == numberOfNeighbours)
                                         blockingQueue.add(1);
-                                } else {
+                                }
+
+                                if(parsedLine[1].equalsIgnoreCase("compute")) {
                                     synchronized (llc_lock){
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
-                                        recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
-                                        //for debugging send and recv arrays
-                                        /*if(llc_value>100){
-                                            //print send and recv array
-                                            System.out.println("SEND ARRAY");
-                                            for(int i : sendArray){
-                                                System.out.printf("%d ",i);
-                                            }
-                                            System.out.println();
-                                            System.out.println("RECV ARRAY");
-                                            for(int i : recvArray){
-                                                System.out.printf("%d ",i);
-                                            }
-                                            System.out.println();
-                                        }*/
-                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
+                                        recvArray[Integer.parseInt(parsedLine[2])-1]++;
+                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[2]));
                                     }
+                                }
+
+                                if(parsedLine[1].equalsIgnoreCase("marker")) {
+                                    Thread interceptMarkers = new Thread(()->{
+                                        try {
+                                            Thread.sleep(1000);
+                                        } catch (InterruptedException e) {
+                                            e.printStackTrace();
+                                        }
+                                        if(!coordinator){
+                                            synchronized (markerLock){
+                                                System.out.println("received MARKER from PID# "+parsedLine[2]);
+                                                if(!firstMarkerReceived){
+                                                    firstMarkerReceived = true;
+                                                    System.out.println("SEND : "+Arrays.toString(sendArray));
+                                                    System.out.println("RECV : "+Arrays.toString(recvArray));
+                                                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                                                    chnlArray[Integer.parseInt(parsedLine[2])-1] = 0;
+                                                    forwardMarker = true;
+                                                } else {
+                                                    neighbourMarkerCounter++;
+                                                    chnlArray[Integer.parseInt(parsedLine[2])-1]
+                                                            = recvArray[Integer.parseInt(parsedLine[2])-1] - chnlArray[Integer.parseInt(parsedLine[2])-1];
+                                                    if(neighbourMarkerCounter==numberOfNeighbours-1){
+                                                        System.out.println("CHNL : "+Arrays.toString(chnlArray));
+                                                        //reset all
+                                                        neighbourMarkerCounter = 0;
+                                                        firstMarkerReceived = false;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if(coordinator){
+                                            synchronized (markerLock){
+                                                System.out.println("recieved MARKER from PID# "+parsedLine[2]);
+                                                neighbourMarkerCounter++;
+                                                chnlArray[Integer.parseInt(parsedLine[2])-1]
+                                                        = recvArray[Integer.parseInt(parsedLine[2])-1] - chnlArray[Integer.parseInt(parsedLine[2])-1];
+                                                if(neighbourMarkerCounter==numberOfNeighbours){
+                                                    System.out.println("CHNL : "+Arrays.toString(chnlArray));
+                                                    //reset all
+                                                    neighbourMarkerCounter = 0;
+                                                }
+                                            }
+                                        }
+                                    });
+                                    interceptMarkers.start();
                                 }
                             }
                             out.close();
@@ -368,10 +461,12 @@ public class deploy {
                 if (parsedLines[0].equalsIgnoreCase("NUMBER")) {
                     NUMBER_OF_PROCS = Integer.parseInt(parsedLines[3]);
                 }
-                if (parsedLines[0].equalsIgnoreCase("INTERVAL"))
-                    continue;
-                if (parsedLines[0].equalsIgnoreCase("TERMINATE"))
-                    continue;
+                if (parsedLines[0].equalsIgnoreCase("INTERVAL")){
+                    INTERVAL = Integer.parseInt(parsedLines[1]);
+                }
+                if (parsedLines[0].equalsIgnoreCase("TERMINATE")){
+                    TERMINATE = Integer.parseInt(parsedLines[1]);
+                }
                 if (parsedLines[0].equalsIgnoreCase("NEIGHBOR")) {
                     while ((line = reader.readLine()) != null) {
                         if (line.equals("")) {
