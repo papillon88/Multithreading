@@ -1,16 +1,21 @@
 import java.io.*;
-import java.lang.reflect.Array;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class deploy {
 
+    //RANDOMIZING ELEMENT
+    static final SecureRandom random = new SecureRandom();
+
+
     //CLOCK
     static volatile int llc_value= 0;
     static Object llc_lock = new Object();
+
 
     //MARKER
     static volatile boolean forwardMarker = false;
@@ -19,8 +24,11 @@ public class deploy {
     static volatile int resetMarkerCounter = 0;
     static Object yetAnotherMarkerLock = new Object();
     static volatile int neighbourMarkerCounter = 0;
+    static volatile int recordingState = 0;
+
 
     //COORDINATOR PROCESS PARAMS
+    static boolean coordinator = false;
     static int NUMBER_OF_PROCS;
     static volatile int numberOfProcessRegistered = 0;
     static volatile int numberOfProcessReady = 0;
@@ -31,7 +39,6 @@ public class deploy {
     static int PROCESSID;
     static int INTERVAL;
     static int TERMINATE;
-    static boolean coordinator = false;
 
 
     //NON COORDINATOR PROCESS PARAMS
@@ -46,6 +53,7 @@ public class deploy {
     static volatile int[] sendArray;
     static volatile int[] recvArray;
     static volatile int[] chnlArray;
+
 
     public static void main(String[] args) {
 
@@ -159,15 +167,7 @@ public class deploy {
                     System.out.println("SEND : "+Arrays.toString(sendArray));
                     System.out.println("RECV : "+Arrays.toString(recvArray));
                     System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
-                    forwardMarker=true;
-
-                    while (true){
-                        if(llc_value>300)
-                            break;
-                    }
-                    System.out.println("SEND : "+Arrays.toString(sendArray));
-                    System.out.println("RECV : "+Arrays.toString(recvArray));
-                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    recordingState++;
                     forwardMarker=true;
                 });
                 chandyLamportInit.start();
@@ -296,12 +296,10 @@ public class deploy {
                         Thread forwardMarkerThread = new Thread(()->{
                             while (true){
                                 if(forwardMarker){
-                                    out.println(llc_value+",marker,"+PROCESSID);
+                                    out.println(llc_value+",marker,"+PROCESSID+","+recordingState);
                                     System.out.println("FORWARDED MARKER");
                                     synchronized (yetAnotherMarkerLock){
                                         resetMarkerCounter++;
-                                        System.out.println("!!!!!!!!!RESET!!!!!!"+resetMarkerCounter);
-                                        System.out.println("!!!!!!!!!NEIGH!!!!!"+numberOfNeighbours);
                                     }
                                     while (true){
                                         if(resetMarkerCounter%numberOfNeighbours==0){
@@ -317,14 +315,17 @@ public class deploy {
 
                         while (true) {
                             if (canSendCompute) {
+                                Thread.sleep(random.nextInt(100));
                                 synchronized (llc_lock){
-                                    llc_value++;
-                                    sendArray[n.getId()-1]++;
-                                    out.println(llc_value+",compute," + PROCESSID);
+                                    int numberOfMessages = random.nextInt(3);
+                                    while (numberOfMessages!=0){
+                                        llc_value++;
+                                        sendArray[n.getId()-1]++;
+                                        out.println(llc_value+",compute," + PROCESSID);
+                                        numberOfMessages--;
+                                    }
                                 }
-                                //Thread.sleep(500);
                             }
-                            Thread.sleep(200);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
