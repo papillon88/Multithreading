@@ -25,6 +25,8 @@ public class deploy {
     static Object yetAnotherMarkerLock = new Object();
     static volatile int neighbourMarkerCounter = 0;
     static volatile int recordingState = 0;
+    static volatile ArrayBlockingQueue<Integer> mrkQueue = new ArrayBlockingQueue<Integer>(100);
+    static volatile ArrayBlockingQueue<Integer> pidQueue = new ArrayBlockingQueue<Integer>(100);
 
 
     //COORDINATOR PROCESS PARAMS
@@ -164,11 +166,25 @@ public class deploy {
                         if(llc_value>100)
                             break;
                     }
-                    System.out.println("SEND : "+Arrays.toString(sendArray));
-                    System.out.println("RECV : "+Arrays.toString(recvArray));
-                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
                     recordingState++;
+                    Record record1 = new Record(recordingState,sendArray,recvArray);
+                    System.out.println("SEND : "+Arrays.toString(record1.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record1.getRecv()));
+                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
                     forwardMarker=true;
+
+
+                    while (true){
+                        if(llc_value>200)
+                            break;
+                    }
+                    recordingState++;
+                    Record record2 = new Record(recordingState,sendArray,recvArray);
+                    System.out.println("SEND : "+Arrays.toString(record2.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record2.getRecv()));
+                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    forwardMarker=true;
+
                 });
                 chandyLamportInit.start();
             }
@@ -379,28 +395,55 @@ public class deploy {
                                     Thread interceptMarkers = new Thread(()->{
                                         try {
                                             Thread.sleep(1000);
+                                            Integer markerSequence = Integer.parseInt(parsedLine[3]);
+                                            if(!mrkQueue.contains(markerSequence)){
+                                                mrkQueue.put(markerSequence);
+                                                pidQueue.put(Integer.parseInt(parsedLine[2]));
+                                                System.out.println(mrkQueue.size()+"********************"+mrkQueue.peek());
+                                            }
                                         } catch (InterruptedException e) {
                                             e.printStackTrace();
                                         }
-                                        if(!coordinator){
-                                            synchronized (markerLock){
-                                                System.out.println("received MARKER from PID# "+parsedLine[2]);
-                                                if(!firstMarkerReceived){
-                                                    firstMarkerReceived = true;
-                                                    System.out.println("SEND : "+Arrays.toString(sendArray));
-                                                    System.out.println("RECV : "+Arrays.toString(recvArray));
-                                                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
-                                                    chnlArray[Integer.parseInt(parsedLine[2])-1] = 0;
-                                                    forwardMarker = true;
-                                                } else {
-                                                    neighbourMarkerCounter++;
-                                                    chnlArray[Integer.parseInt(parsedLine[2])-1]
-                                                            = recvArray[Integer.parseInt(parsedLine[2])-1] - chnlArray[Integer.parseInt(parsedLine[2])-1];
-                                                    if(neighbourMarkerCounter==numberOfNeighbours-1){
-                                                        System.out.println("CHNL : "+Arrays.toString(chnlArray));
-                                                        //reset all
-                                                        neighbourMarkerCounter = 0;
-                                                        firstMarkerReceived = false;
+
+                                        if(mrkQueue.peek()!=null){
+                                            int markerMessage = mrkQueue.peek();
+                                            if(!coordinator){
+                                                synchronized (markerLock){
+                                                    System.out.println("received MARKER from PID# "+parsedLine[2]);
+                                                    if(Integer.parseInt(parsedLine[3])==markerMessage){
+                                                        if(!firstMarkerReceived){
+                                                            firstMarkerReceived = true;
+                                                            System.out.println("SEND : "+Arrays.toString(sendArray));
+                                                            System.out.println("RECV : "+Arrays.toString(recvArray));
+                                                            System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                                                            chnlArray[pidQueue.peek()-1] = 0;
+                                                            recordingState = mrkQueue.peek();
+                                                            System.out.println("STARTING RECORDING STATE : "+recordingState);
+                                                            forwardMarker = true;
+                                                        } else {
+                                                            neighbourMarkerCounter++;
+                                                            chnlArray[Integer.parseInt(parsedLine[2])-1]
+                                                                    = recvArray[Integer.parseInt(parsedLine[2])-1] - chnlArray[Integer.parseInt(parsedLine[2])-1];
+                                                            if(neighbourMarkerCounter==numberOfNeighbours-1){
+                                                                System.out.println("FINISHED RECORDING STATE : "+recordingState);
+                                                                System.out.println("CHNL : "+Arrays.toString(chnlArray));
+                                                                //reset all
+                                                                neighbourMarkerCounter = 0;
+                                                                firstMarkerReceived = false;
+                                                                mrkQueue.remove();
+                                                                pidQueue.remove();
+                                                                if(mrkQueue.peek()!=null){
+                                                                    firstMarkerReceived = true;
+                                                                    System.out.println("SEND : "+Arrays.toString(sendArray));
+                                                                    System.out.println("RECV : "+Arrays.toString(recvArray));
+                                                                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                                                                    chnlArray[pidQueue.peek()-1] = 0;
+                                                                    recordingState = mrkQueue.peek();
+                                                                    System.out.println("STARTING RECORDING STATE : "+recordingState);
+                                                                    forwardMarker = true;
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -538,3 +581,58 @@ class Neighbour {
     }
 }
 */
+
+class Record {
+
+    boolean done = false;
+    int recordingState;
+    int[] send;
+    int[] recv;
+    int[] chnl;
+
+    public Record(int recordingState, int[] send, int[] recv) {
+        this.recordingState = recordingState;
+        this.send = send;
+        this.recv = recv;
+    }
+
+    public boolean isDone() {
+        return done;
+    }
+
+    public void setDone(boolean done) {
+        this.done = done;
+    }
+
+    public int getRecordingState() {
+        return recordingState;
+    }
+
+    public void setRecordingState(int recordingState) {
+        this.recordingState = recordingState;
+    }
+
+    public int[] getSend() {
+        return send;
+    }
+
+    public void setSend(int[] send) {
+        this.send = send;
+    }
+
+    public int[] getRecv() {
+        return recv;
+    }
+
+    public void setRecv(int[] recv) {
+        this.recv = recv;
+    }
+
+    public int[] getChnl() {
+        return chnl;
+    }
+
+    public void setChnl(int[] chnl) {
+        this.chnl = chnl;
+    }
+}
