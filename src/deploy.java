@@ -8,6 +8,9 @@ import java.util.concurrent.BlockingQueue;
 
 public class deploy {
 
+    //Files and i/o related
+    static BufferedWriter stateWriter;
+
     //RANDOMIZING ELEMENT
     static final SecureRandom random = new SecureRandom();
 
@@ -38,6 +41,8 @@ public class deploy {
     static final String CONFIG = "/home/013/d/dx/dxc141530/dsConfig";
     static Map<Integer, Set<Integer>> neighbours = new HashMap<>();
     static Map<Integer, Neighbour> pidToHostnameMap = new HashMap<>();
+    static volatile int[][] channelMatrix;
+    static volatile Record[] recordsBook = new Record[500];
     static int PROCESSID;
     static int INTERVAL;
     static int TERMINATE;
@@ -47,6 +52,7 @@ public class deploy {
     static volatile boolean canSendHello = false;
     static volatile boolean canSendReady = true;
     static volatile boolean canSendCompute = false;
+    static volatile boolean closeAllComputes = false;
     static BlockingQueue<Integer> blockingQueue = new ArrayBlockingQueue<>(1);
     static volatile int numberOfNeighbours = 0;
     static volatile int neighbourCounter = 0;
@@ -162,15 +168,20 @@ public class deploy {
 
 
                 Thread chandyLamportInit = new Thread(()->{
+
+                    channelMatrix = new int[100][NUMBER_OF_PROCS];
+
                     while (true){
                         if(llc_value>100)
                             break;
                     }
                     recordingState++;
                     Record record1 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record1;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
                     System.out.println("SEND : "+Arrays.toString(record1.getSend()));
                     System.out.println("RECV : "+Arrays.toString(record1.getRecv()));
-                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record1.getRecv(),0,channelMatrix[record1.getRecordingState()-1],0,recvArray.length);
                     forwardMarker=true;
 
 
@@ -180,9 +191,73 @@ public class deploy {
                     }
                     recordingState++;
                     Record record2 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record2;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
                     System.out.println("SEND : "+Arrays.toString(record2.getSend()));
                     System.out.println("RECV : "+Arrays.toString(record2.getRecv()));
-                    System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    //System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record2.getRecv(),0,channelMatrix[record2.getRecordingState()-1],0,recvArray.length);
+                    System.out.println(Arrays.toString(channelMatrix[record2.getRecordingState()-1]));
+                    forwardMarker=true;
+
+                    while (true){
+                        if(llc_value>300)
+                            break;
+                    }
+                    recordingState++;
+                    Record record3 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record3;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
+                    System.out.println("SEND : "+Arrays.toString(record3.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record3.getRecv()));
+                    //System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record3.getRecv(),0,channelMatrix[record3.getRecordingState()-1],0,recvArray.length);
+                    System.out.println(Arrays.toString(channelMatrix[record3.getRecordingState()-1]));
+                    forwardMarker=true;
+
+                    while (true){
+                        if(llc_value>400)
+                            break;
+                    }
+                    recordingState++;
+                    Record record4 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record4;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
+                    System.out.println("SEND : "+Arrays.toString(record4.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record4.getRecv()));
+                    //System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record4.getRecv(),0,channelMatrix[record4.getRecordingState()-1],0,recvArray.length);
+                    System.out.println(Arrays.toString(channelMatrix[record4.getRecordingState()-1]));
+                    forwardMarker=true;
+
+                    while (true){
+                        if(llc_value>500)
+                            break;
+                    }
+                    recordingState++;
+                    Record record5 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record5;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
+                    System.out.println("SEND : "+Arrays.toString(record5.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record5.getRecv()));
+                    //System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record5.getRecv(),0,channelMatrix[record5.getRecordingState()-1],0,recvArray.length);
+                    System.out.println(Arrays.toString(channelMatrix[record5.getRecordingState()-1]));
+                    forwardMarker=true;
+
+                    while (true){
+                        if(llc_value>600)
+                            break;
+                    }
+                    recordingState++;
+                    Record record6 = new Record(recordingState,sendArray,recvArray);
+                    recordsBook[recordingState-1]=record6;
+                    System.out.println("STARTING RECORDING STATE : "+recordingState);
+                    System.out.println("SEND : "+Arrays.toString(record6.getSend()));
+                    System.out.println("RECV : "+Arrays.toString(record6.getRecv()));
+                    //System.arraycopy(recvArray,0,chnlArray,0,recvArray.length);
+                    System.arraycopy(record6.getRecv(),0,channelMatrix[record6.getRecordingState()-1],0,recvArray.length);
+                    System.out.println(Arrays.toString(channelMatrix[record6.getRecordingState()-1]));
                     forwardMarker=true;
 
                 });
@@ -243,6 +318,15 @@ public class deploy {
                             System.out.println("    -----------------------");
                             System.out.println();
                         }
+
+                        //create local state file and a buffered writer to append to it
+                        File file = new File("localstate_"+PROCESSID);
+                        if(file.exists())
+                            file.delete();
+                        file.createNewFile();
+                        stateWriter = new BufferedWriter(new FileWriter(file.getName(),true));
+
+
                         synchronized (lock) {
                             canSendHello = true;
                         }
@@ -342,6 +426,8 @@ public class deploy {
                                     }
                                 }
                             }
+                            if(closeAllComputes)
+                                break;
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -387,7 +473,8 @@ public class deploy {
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
                                         recvArray[Integer.parseInt(parsedLine[2])-1]++;
-                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[2]));
+                                        if(!closeAllComputes)
+                                            System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[2]));
                                     }
                                 }
 
@@ -407,9 +494,10 @@ public class deploy {
 
                                         if(mrkQueue.peek()!=null){
                                             int markerMessage = mrkQueue.peek();
+
                                             if(!coordinator){
                                                 synchronized (markerLock){
-                                                    System.out.println("received MARKER from PID# "+parsedLine[2]);
+                                                    System.out.println("received MARKER# "+parsedLine[3]+" from PID# "+parsedLine[2]);
                                                     if(Integer.parseInt(parsedLine[3])==markerMessage){
                                                         if(!firstMarkerReceived){
                                                             firstMarkerReceived = true;
@@ -419,6 +507,17 @@ public class deploy {
                                                             chnlArray[pidQueue.peek()-1] = 0;
                                                             recordingState = mrkQueue.peek();
                                                             System.out.println("STARTING RECORDING STATE : "+recordingState);
+                                                            try {
+                                                                stateWriter.write("Recording count "+recordingState);
+                                                                stateWriter.newLine();
+                                                                stateWriter.write("SENT "+Arrays.toString(sendArray).replace("[","").replace("]","").replace(",",""));
+                                                                stateWriter.newLine();
+                                                                stateWriter.write("RECV "+Arrays.toString(recvArray).replace("[","").replace("]","").replace(",",""));
+                                                                stateWriter.newLine();
+                                                                stateWriter.flush();
+                                                            } catch (IOException e) {
+                                                                e.printStackTrace();
+                                                            }
                                                             forwardMarker = true;
                                                         } else {
                                                             neighbourMarkerCounter++;
@@ -427,11 +526,23 @@ public class deploy {
                                                             if(neighbourMarkerCounter==numberOfNeighbours-1){
                                                                 System.out.println("FINISHED RECORDING STATE : "+recordingState);
                                                                 System.out.println("CHNL : "+Arrays.toString(chnlArray));
+                                                                try {
+                                                                    stateWriter.write("CHANNEL "+Arrays.toString(chnlArray).replace("[","").replace("]","").replace(",",""));
+                                                                    stateWriter.newLine();
+                                                                    stateWriter.flush();
+                                                                } catch (IOException e) {
+                                                                    e.printStackTrace();
+                                                                }
                                                                 //reset all
                                                                 neighbourMarkerCounter = 0;
                                                                 firstMarkerReceived = false;
                                                                 mrkQueue.remove();
                                                                 pidQueue.remove();
+                                                                if(Integer.parseInt(parsedLine[3])==6){
+                                                                    System.out.println("********************************************CLOSING ALL (Ctrl + C to exit)");
+                                                                    canSendCompute = false;
+                                                                    closeAllComputes = true;
+                                                                }
                                                                 if(mrkQueue.peek()!=null){
                                                                     firstMarkerReceived = true;
                                                                     System.out.println("SEND : "+Arrays.toString(sendArray));
@@ -440,6 +551,17 @@ public class deploy {
                                                                     chnlArray[pidQueue.peek()-1] = 0;
                                                                     recordingState = mrkQueue.peek();
                                                                     System.out.println("STARTING RECORDING STATE : "+recordingState);
+                                                                    try {
+                                                                        stateWriter.write("Recording count "+recordingState);
+                                                                        stateWriter.newLine();
+                                                                        stateWriter.write("SENT "+Arrays.toString(sendArray).replace("[","").replace("]","").replace(",",""));
+                                                                        stateWriter.newLine();
+                                                                        stateWriter.write("RECV "+Arrays.toString(recvArray).replace("[","").replace("]","").replace(",",""));
+                                                                        stateWriter.newLine();
+                                                                        stateWriter.flush();
+                                                                    } catch (IOException e) {
+                                                                        e.printStackTrace();
+                                                                    }
                                                                     forwardMarker = true;
                                                                 }
                                                             }
@@ -447,18 +569,43 @@ public class deploy {
                                                     }
                                                 }
                                             }
-                                        }
 
-                                        if(coordinator){
-                                            synchronized (markerLock){
-                                                System.out.println("recieved MARKER from PID# "+parsedLine[2]);
-                                                neighbourMarkerCounter++;
-                                                chnlArray[Integer.parseInt(parsedLine[2])-1]
-                                                        = recvArray[Integer.parseInt(parsedLine[2])-1] - chnlArray[Integer.parseInt(parsedLine[2])-1];
-                                                if(neighbourMarkerCounter==numberOfNeighbours){
-                                                    System.out.println("CHNL : "+Arrays.toString(chnlArray));
-                                                    //reset all
-                                                    neighbourMarkerCounter = 0;
+                                            if(coordinator){
+                                                synchronized (markerLock){
+                                                    System.out.println("recieved MARKER# "+parsedLine[3]+" from PID# "+parsedLine[2]);
+                                                    if(Integer.parseInt(parsedLine[3])==markerMessage){
+                                                        neighbourMarkerCounter++;
+                                                        channelMatrix[Integer.parseInt(parsedLine[3])-1]
+                                                                [Integer.parseInt(parsedLine[2])-1]
+                                                                = recvArray[Integer.parseInt(parsedLine[2])-1]
+                                                                - channelMatrix[Integer.parseInt(parsedLine[3])-1]
+                                                                [Integer.parseInt(parsedLine[2])-1];
+                                                        if(neighbourMarkerCounter==numberOfNeighbours){
+                                                            System.out.println("FINISHED RECORDING STATE : "+Integer.parseInt(parsedLine[3]));
+                                                            System.out.println("CHNL : "+Arrays.toString(channelMatrix[Integer.parseInt(parsedLine[3])-1]));
+                                                            try {
+                                                                stateWriter.write("Recording count "+parsedLine[3]);
+                                                                stateWriter.newLine();
+                                                                stateWriter.write("SENT "+Arrays.toString(recordsBook[Integer.parseInt(parsedLine[3])-1].getSend()).replace("[","").replace("]","").replace(",",""));
+                                                                stateWriter.newLine();
+                                                                stateWriter.write("RECV "+Arrays.toString(recordsBook[Integer.parseInt(parsedLine[3])-1].getRecv()).replace("[","").replace("]","").replace(",",""));
+                                                                stateWriter.newLine();
+                                                                stateWriter.write("CHANNEL "+Arrays.toString(channelMatrix[Integer.parseInt(parsedLine[3])-1]).replace("[","").replace("]","").replace(",",""));
+                                                                stateWriter.newLine();
+                                                                stateWriter.flush();
+                                                            } catch (IOException e) {
+                                                                e.printStackTrace();
+                                                            }
+                                                            //reset all
+                                                            neighbourMarkerCounter = 0;
+                                                            mrkQueue.remove();
+                                                            if(Integer.parseInt(parsedLine[3])==6){
+                                                                System.out.println("********************************************CLOSING ALL (Ctrl + C to exit)");
+                                                                canSendCompute = false;
+                                                                closeAllComputes = true;
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -592,8 +739,10 @@ class Record {
 
     public Record(int recordingState, int[] send, int[] recv) {
         this.recordingState = recordingState;
-        this.send = send;
-        this.recv = recv;
+        this.send = new int[send.length];
+        System.arraycopy(send,0,this.send,0,send.length);
+        this.recv = new int[recv.length];
+        System.arraycopy(recv,0,this.recv,0,recv.length);
     }
 
     public boolean isDone() {
