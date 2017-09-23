@@ -28,8 +28,8 @@ public class deploy {
     static Object yetAnotherMarkerLock = new Object();
     static volatile int neighbourMarkerCounter = 0;
     static volatile int recordingState = 0;
-    static volatile ArrayBlockingQueue<Integer> mrkQueue = new ArrayBlockingQueue<Integer>(100);
-    static volatile ArrayBlockingQueue<Integer> pidQueue = new ArrayBlockingQueue<Integer>(100);
+    static volatile ArrayBlockingQueue<Integer> mrkQueue = new ArrayBlockingQueue<Integer>(300);
+    static volatile ArrayBlockingQueue<Integer> pidQueue = new ArrayBlockingQueue<Integer>(300);
 
 
     //COORDINATOR PROCESS PARAMS
@@ -38,7 +38,7 @@ public class deploy {
     static volatile int numberOfProcessRegistered = 0;
     static volatile int numberOfProcessReady = 0;
     static Object coordinatorLock = new Object();
-    static final String CONFIG = "/home/013/d/dx/dxc141530/dsConfig";
+    static final String CONFIG = "dsConfig";
     static Map<Integer, Set<Integer>> neighbours = new HashMap<>();
     static Map<Integer, Neighbour> pidToHostnameMap = new HashMap<>();
     static volatile int[][] channelMatrix;
@@ -539,7 +539,7 @@ public class deploy {
                                                                 mrkQueue.remove();
                                                                 pidQueue.remove();
                                                                 if(Integer.parseInt(parsedLine[3])==6){
-                                                                    System.out.println("********************************************CLOSING ALL (Ctrl + C to exit)");
+                                                                    System.out.println("********************************************PROCESS TERMINATED (Ctrl + C to exit)");
                                                                     canSendCompute = false;
                                                                     closeAllComputes = true;
                                                                 }
@@ -600,7 +600,7 @@ public class deploy {
                                                             neighbourMarkerCounter = 0;
                                                             mrkQueue.remove();
                                                             if(Integer.parseInt(parsedLine[3])==6){
-                                                                System.out.println("********************************************CLOSING ALL (Ctrl + C to exit)");
+                                                                System.out.println("********************************************PROCESS TERMINATED (Ctrl + C to exit)");
                                                                 canSendCompute = false;
                                                                 closeAllComputes = true;
                                                             }
