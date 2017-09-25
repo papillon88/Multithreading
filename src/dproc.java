@@ -311,7 +311,7 @@ public class dproc {
                                 recordingState=FINAL_MARKER;
                                 record = new Record(recordingState,sendArray,recvArray);
                                 recordsBook[recordingState]=record;
-                                System.out.println("STARTING RECORDING STATE : "+recordingState);
+                                System.out.println("STARTING FINAL RECORDING STATE : "+recordingState);
                                 System.out.println("SEND : "+Arrays.toString(record.getSend()));
                                 System.out.println("RECV : "+Arrays.toString(record.getRecv()));
                                 System.arraycopy(record.getRecv(),0,channelMatrix[record.getRecordingState()],0,recvArray.length);
@@ -650,9 +650,10 @@ public class dproc {
                                                                 mrkQueue.remove();
                                                                 pidQueue.remove();
                                                                 if(Integer.parseInt(parsedLine[3])==FINAL_MARKER){
-                                                                    System.out.println("********************************************PROCESS TERMINATED (Ctrl + C to exit)");
+                                                                    System.out.println("********************************************PROCESS TERMINATED");
                                                                     canSendCompute = false;
                                                                     closeAllComputes = true;
+                                                                    System.exit(0);
                                                                 }
                                                                 //check if theres another marker next in queue
                                                                 if(mrkQueue.peek()!=null){
@@ -724,9 +725,10 @@ public class dproc {
                                                             neighbourMarkerCounter = 0;
                                                             mrkQueue.remove();
                                                             if(Integer.parseInt(parsedLine[3])==FINAL_MARKER){
-                                                                System.out.println("********************************************PROCESS TERMINATED (Ctrl + C to exit)");
+                                                                System.out.println("********************************************PROCESS TERMINATED");
                                                                 canSendCompute = false;
                                                                 closeAllComputes = true;
+                                                                System.exit(0);
                                                             }
                                                         }
                                                     }
