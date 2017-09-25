@@ -147,17 +147,6 @@ public class dproc {
 
     public static void main(String[] args) {
 
-        Scanner scanner = new Scanner(System.in);
-        System.out.print("Enter coordinator port number or hit ENTER to use default(5001) : ");
-        String cpString = scanner.nextLine();
-        if(!cpString.equalsIgnoreCase(""))
-            CP_PORT=Integer.parseInt(cpString);
-        System.out.print("Enter non coordinator port number or hit ENTER to use default(5000) : ");
-        String ncpString = scanner.nextLine();
-        if(!ncpString.equalsIgnoreCase(""))
-            NCP_PORT=Integer.parseInt(cpString);
-
-
         if (args.length != 0) {
             if (args[0].equalsIgnoreCase("-c")) {
 
@@ -817,8 +806,7 @@ public class dproc {
     }
 }
 
-/*
-class Neighbour {
+/*class Neighbour {
     private int id;
     private String hostname;
     private String portnum;
@@ -863,8 +851,7 @@ class Neighbour {
     public int getId() {
         return id;
     }
-}
-*/
+}*/
 
 //hold each recording state in memory
 //used exclusively by the CP
