@@ -24,7 +24,7 @@ public class deploy {
     //NON COORDINATOR PROCESS PARAMS
     static volatile boolean canSendHello = false;
     static volatile boolean canSendReady = true;
-    static volatile boolean canSendCompute = false;
+    static volatile boolean canSendCSRequestAndTokens = false;
     static BlockingQueue<Integer> blockingQueue = new ArrayBlockingQueue<>(1);
     static volatile int numberOfNeighbours = 0;
     static volatile int neighbourCounter = 0;
@@ -33,12 +33,27 @@ public class deploy {
     static volatile int[] sendArray;
     static volatile int[] recvArray;
 
+
+    //SUZUKI KASAMI
+    static Object sk_lock = new Object();
+    static BlockingQueue<Integer> skBlockingQueue = new ArrayBlockingQueue<>(1);
+    static volatile int requestNumber = 0;
+
+
+    //SUZUKI KASAMI TOKEN RELATED
+    static volatile boolean hasToken = false;
+    static volatile int[] tokenArray;
+    static volatile Queue<Integer> queueOfProcsVchWillReceiveTheTokenNext;
+
+
+
     public static void main(String[] args) {
 
         if (args.length != 0) {
             if (args[0].equalsIgnoreCase("-c")) {
                 //Running the coordinator part of the process
                 runConfiguration(CONFIG);
+                hasToken = true;
 
                 Thread coordinatorThread = new Thread(() -> {
                     System.out.println();
@@ -168,6 +183,8 @@ public class deploy {
                 int arraySize = Integer.parseInt(totalNumberOfProcs[3]);
                 sendArray = new int[arraySize];
                 recvArray = new int[arraySize];
+                tokenArray = new int[arraySize];
+                queueOfProcsVchWillReceiveTheTokenNext = new LinkedList<>();
 
                 String line;
                 while ((line = in.readLine()) != null) {
@@ -221,7 +238,7 @@ public class deploy {
                                 System.out.printf("<%d> received compute from coordinator%n",llc_value);
                                 System.out.println();
                             }
-                            canSendCompute = true;
+                            canSendCSRequestAndTokens = true;
                         }
                     }
                 }
@@ -255,17 +272,54 @@ public class deploy {
                         synchronized (llc_lock){
                             llc_value++;
                             sendArray[n.getId()-1]++;
-                            out.println(llc_value+" hello from PID "+PROCESSID);
+                            out.println(llc_value+",hello,"+PROCESSID);
                             System.out.printf("<%d> sending hello to PID %d%n",llc_value,n.getId());
                         }
+
+
                         while (true) {
-                            if (canSendCompute) {
-                                synchronized (llc_lock){
-                                    llc_value++;
-                                    sendArray[n.getId()-1]++;
-                                    out.println(llc_value+" compute from PID " + PROCESSID);
+                            if (canSendCSRequestAndTokens) {
+                                if(!hasToken){
+                                    synchronized (llc_lock){
+                                        llc_value++;
+                                        sendArray[n.getId()-1]++;
+                                        out.println(llc_value+",request," + PROCESSID);
+                                        canSendCSRequestAndTokens = false;
+                                    }
                                 }
-                                Thread.sleep(10000);
+                                if(hasToken){
+                                    System.out.println("SEND "+Arrays.toString(sendArray));
+                                    System.out.println("RECV "+Arrays.toString(recvArray));
+
+                                    System.out.println("TOKN "+Arrays.toString(tokenArray));
+                                    System.out.println("QUEU "+queueOfProcsVchWillReceiveTheTokenNext.toString());
+
+                                    Thread tokenThread = new Thread(()->{
+                                        synchronized (sk_lock){
+                                            if(!skBlockingQueue.isEmpty()){
+                                                skBlockingQueue.remove();
+                                                try {
+                                                    executeCS();
+                                                } catch (InterruptedException e) {
+                                                    e.printStackTrace();
+                                                }
+                                            }
+
+                                            //post CS execution work
+                                            for(int i=0;i<tokenArray.length;i++){
+                                                if(tokenArray[i]+1==recvArray[i]){
+                                                    queueOfProcsVchWillReceiveTheTokenNext.add(i+1);
+                                                }
+                                            }
+
+                                            //send the token now to the first member of the queue
+                                            tokenArray[PROCESSID-1]=requestNumber;
+                                            hasToken = true;
+
+                                        }
+                                    });
+                                    tokenThread.start();
+                                }
                             }
                             Thread.sleep(900);
                         }
@@ -291,13 +345,13 @@ public class deploy {
                             BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                             String line;
                             while ((line = in.readLine()) != null) {
-                                String[] parsedLine = line.split(" ");
+                                String[] parsedLine = line.split(",");
+
                                 if (parsedLine[1].equalsIgnoreCase("hello")) {
                                     synchronized (llc_lock){
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
-                                        recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
                                         System.out.printf("<%d> received hello from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                     synchronized (lock) {
@@ -305,27 +359,55 @@ public class deploy {
                                     }
                                     if (neighbourCounter == numberOfNeighbours)
                                         blockingQueue.add(1);
-                                } else {
-                                    synchronized (llc_lock){
+                                }
+
+                                if (parsedLine[1].equalsIgnoreCase("token")) {
+                                    //print token status for debug
+                                    System.out.println("SEND "+Arrays.toString(sendArray));
+                                    System.out.println("RECV "+Arrays.toString(recvArray));
+
+                                    System.out.println("TOKN "+Arrays.toString(tokenArray));
+                                    System.out.println("QUEU "+queueOfProcsVchWillReceiveTheTokenNext.toString());
+
+                                    Thread tokenThread = new Thread(()->{
+                                        synchronized (sk_lock){
+                                            if(!skBlockingQueue.isEmpty()){
+                                                skBlockingQueue.remove();
+                                                try {
+                                                    executeCS();
+                                                } catch (InterruptedException e) {
+                                                    e.printStackTrace();
+                                                }
+                                            }
+
+                                            //post CS execution work
+                                            for(int i=0;i<tokenArray.length;i++){
+                                                if(tokenArray[i]+1==recvArray[i]){
+                                                    queueOfProcsVchWillReceiveTheTokenNext.add(i+1);
+                                                }
+                                            }
+
+                                            //send the token now to the first member of the queue
+                                            tokenArray[PROCESSID-1]=requestNumber;
+                                            hasToken = true;
+
+                                        }
+                                    });
+                                    tokenThread.start();
+                                }
+
+                                if (parsedLine[1].equalsIgnoreCase("request")) {
+                                    System.out.println("SEND "+Arrays.toString(sendArray));
+                                    System.out.println("RECV "+Arrays.toString(recvArray));
+
+                                    System.out.println("TOKN "+Arrays.toString(tokenArray));
+                                    System.out.println("QUEU "+queueOfProcsVchWillReceiveTheTokenNext.toString());
+                                    synchronized (sk_lock){
                                         int senderProcTS = Integer.parseInt(parsedLine[0]);
                                         int maxOfTS = Math.max(senderProcTS,llc_value);
                                         llc_value=maxOfTS+1;
                                         recvArray[Integer.parseInt(parsedLine[parsedLine.length-1])-1]++;
-                                        //for debugging send and recv arrays
-                                        /*if(llc_value>100){
-                                            //print send and recv array
-                                            System.out.println("SEND ARRAY");
-                                            for(int i : sendArray){
-                                                System.out.printf("%d ",i);
-                                            }
-                                            System.out.println();
-                                            System.out.println("RECV ARRAY");
-                                            for(int i : recvArray){
-                                                System.out.printf("%d ",i);
-                                            }
-                                            System.out.println();
-                                        }*/
-                                        System.out.printf("<%d> received compute from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
+                                        System.out.printf("<%d> received cs request from PID %d%n",llc_value,Integer.parseInt(parsedLine[parsedLine.length-1]));
                                     }
                                 }
                             }
@@ -391,6 +473,12 @@ public class deploy {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+
+    private static void executeCS() throws InterruptedException {
+        System.out.println("acquiring CS...");
+        Thread.sleep(5000);
     }
 }
 
