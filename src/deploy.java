@@ -5,8 +5,14 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.stream.Stream;
 
 public class deploy {
+
+    //PORT NUMS
+    static final int PORT1 = 5010;
+    static final int PORT2 = 5011;
+
 
     //CLOCK
     static volatile int llc_value = 0;
@@ -46,11 +52,16 @@ public class deploy {
     static volatile int requestNumber = 0;
     static volatile CountDownLatch latch ;
     static volatile StringBuilder tokenBuilder;
+    static volatile boolean terminate = false;
 
     //SUZUKI KASAMI TOKEN RELATED
     static volatile boolean hasToken = false;
     static volatile int[] tokenArray;
     static volatile Queue<Integer> queueOfProcsVchWillReceiveTheTokenNext;
+
+    //SUZUKI KASAMI STATS RELATED
+    static volatile Map<Integer,Long> forWaitTimeCalculation = Collections.synchronizedMap(new HashMap<>());
+    static volatile Map<Integer,List<Long>> forWaitTimeCalculationFinal = Collections.synchronizedMap(new HashMap<>());
 
 
     public static void main(String[] args) {
@@ -68,7 +79,7 @@ public class deploy {
                     System.out.println("<i> ********Waiting for processes to register...");
                     System.out.println();
                     try {
-                        ServerSocket serverSocket = new ServerSocket(5001);
+                        ServerSocket serverSocket = new ServerSocket(PORT2);
                         while (true) {
                             Socket client = serverSocket.accept();
                             Thread handlerThread = new Thread(() -> {
@@ -175,7 +186,7 @@ public class deploy {
             try {
                 BufferedReader reader = new BufferedReader(new FileReader(CONFIG));
                 String[] params = reader.readLine().split(" ");
-                Socket client = new Socket(params[1], 5001);
+                Socket client = new Socket(params[1], PORT2);
                 PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                 synchronized (llc_lock) {
@@ -272,10 +283,26 @@ public class deploy {
             Thread skProcessingThread = new Thread(()->{
                 while (true) {
                     if (canSendCSRequestAndTokens) {
+
                         if(!hasToken){
                             latch = new CountDownLatch(localNeighbourSet.size());
                             llc_value++;
                             requestNumber++;
+                            if(isCoordinator){
+                                forWaitTimeCalculation.put(PROCESSID,System.currentTimeMillis());
+                                if(requestNumber==5){
+                                    //print stats
+                                    System.out.printf("PROCESS ID  |   AVERAGE WAIT   |   ROUND WISE WAITS%n");
+                                    for(Map.Entry<Integer,List<Long>> entry : forWaitTimeCalculationFinal.entrySet()){
+                                        System.out.printf("    %d              %s           %s%n"
+                                                ,entry.getKey()
+                                                ,Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble()
+                                                ,Arrays.toString(entry.getValue().toArray()));
+                                    }
+                                    terminate=true;
+                                    break;
+                                }
+                            }
                             skValveSendReq.add(1);
                             try {
                                 latch.await();
@@ -294,7 +321,7 @@ public class deploy {
                                 try {
                                     llc_value++;
                                     System.out.printf("<%d> executing CS...%n",llc_value);
-                                    Thread.sleep(8000);
+                                    Thread.sleep(3000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
@@ -319,8 +346,22 @@ public class deploy {
                                     tokenBuilder.append(PROCESSID);tokenBuilder.append(",");
                                     tokenBuilder.append(queueOfProcsVchWillReceiveTheTokenNext.peek());tokenBuilder.append(",");
                                     tokenBuilder.append(Arrays.toString(tokenArray).replace(",",":").replace(" ",""));tokenBuilder.append(",");
-                                    tokenBuilder.append(queueOfProcsVchWillReceiveTheTokenNext.toString().replace(",",":").replace(" ",""));
+                                    tokenBuilder.append(queueOfProcsVchWillReceiveTheTokenNext.toString().replace(",",":").replace(" ",""));tokenBuilder.append(",");
+                                    tokenBuilder.append(System.currentTimeMillis());
 
+
+                                    if(isCoordinator){
+                                        Long waitTime = System.currentTimeMillis() - forWaitTimeCalculation.get(queueOfProcsVchWillReceiveTheTokenNext.peek());
+                                        if(!forWaitTimeCalculationFinal.containsKey(queueOfProcsVchWillReceiveTheTokenNext.peek())){
+                                            List<Long> waitTimeHolder = new ArrayList<>();
+                                            waitTimeHolder.add(waitTime);
+                                            forWaitTimeCalculationFinal.put(queueOfProcsVchWillReceiveTheTokenNext.peek(),waitTimeHolder);
+                                        } else {
+                                            List<Long> waitTimeHolder = forWaitTimeCalculationFinal.get(queueOfProcsVchWillReceiveTheTokenNext.peek());
+                                            waitTimeHolder.add(waitTime);
+                                            forWaitTimeCalculationFinal.put(queueOfProcsVchWillReceiveTheTokenNext.peek(),waitTimeHolder);
+                                        }
+                                    }
                                     skValveSendToken.add(1);
                                     try {
                                         latch.await();
@@ -338,7 +379,7 @@ public class deploy {
                         }
 
                         try {
-                            Thread.sleep(2000);
+                            Thread.sleep(1000);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -353,7 +394,7 @@ public class deploy {
                 Thread clientThreadAncillary = new Thread(() -> {
                     String line;
                     try {
-                        Socket client = new Socket(n.getHostname(), 5000);
+                        Socket client = new Socket(n.getHostname(), PORT1);
                         PrintWriter out = new PrintWriter(client.getOutputStream(), true);
                         BufferedReader in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
@@ -370,7 +411,7 @@ public class deploy {
                                 out.println(llc_value + ",request,"+PROCESSID+","+requestNumber);
                                 latch.countDown();
                                 try {
-                                    Thread.sleep(4000);
+                                    Thread.sleep(1000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
@@ -381,12 +422,17 @@ public class deploy {
                                 System.out.printf("<%d> SEND : TOKN >> %s ID %s%n", llc_value,tokenBuilder.toString(),n.getId());
                                 latch.countDown();
                                 try {
-                                    Thread.sleep(4000);
+                                    Thread.sleep(1000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
                             }
 
+                            if(terminate){
+                                out.println(llc_value + ",terminate," + PROCESSID);
+                                System.out.println("**************terminating processes");
+                                break;
+                            }
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -399,7 +445,7 @@ public class deploy {
 
         Thread serverThreadMain = new Thread(() -> {
             try {
-                ServerSocket serverSocket = new ServerSocket(5000);
+                ServerSocket serverSocket = new ServerSocket(PORT1);
                 while (true) {
                     Socket client = serverSocket.accept();
                     Thread serverThreadAncillary = new Thread(() -> {
@@ -425,6 +471,18 @@ public class deploy {
                                 }
 
                                 if (parsedLine[1].equalsIgnoreCase("token")) {
+                                    if(isCoordinator){
+                                        Long waitTime = System.currentTimeMillis() - forWaitTimeCalculation.get(Integer.parseInt(parsedLine[3]));
+                                        if(!forWaitTimeCalculationFinal.containsKey(Integer.parseInt(parsedLine[3]))){
+                                            List<Long> waitTimeHolder = new ArrayList<>();
+                                            waitTimeHolder.add(waitTime);
+                                            forWaitTimeCalculationFinal.put(Integer.parseInt(parsedLine[3]),waitTimeHolder);
+                                        } else {
+                                            List<Long> waitTimeHolder = forWaitTimeCalculationFinal.get(Integer.parseInt(parsedLine[3]));
+                                            waitTimeHolder.add(waitTime);
+                                            forWaitTimeCalculationFinal.put(Integer.parseInt(parsedLine[3]),waitTimeHolder);
+                                        }
+                                    }
                                     if(Integer.parseInt(parsedLine[3])==PROCESSID){
 
                                         synchronized (llc_lock) {
@@ -475,7 +533,17 @@ public class deploy {
                                         /*System.out.println("RECV " + Arrays.toString(recvArray));
                                         System.out.println("TOKN " + Arrays.toString(tokenArray));
                                         System.out.println("QUEU " + queueOfProcsVchWillReceiveTheTokenNext.toString());*/
+                                        if(isCoordinator){
+                                            System.out.println("=================================coordinator putting request for " + Integer.parseInt(parsedLine[2]));
+                                            forWaitTimeCalculation.put(Integer.parseInt(parsedLine[2]),System.currentTimeMillis());
+                                        }
                                     }
+                                }
+
+                                if(parsedLine[1].equalsIgnoreCase("terminate")){
+                                    //print stats and exit
+                                    System.out.println("____________PROCESS TERMINATED____________");
+                                    System.exit(0);
                                 }
                             }
                             out.close();
