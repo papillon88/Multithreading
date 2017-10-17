@@ -62,6 +62,7 @@ public class deploy {
     //SUZUKI KASAMI STATS RELATED
     static volatile Map<Integer,Long> forWaitTimeCalculation = Collections.synchronizedMap(new HashMap<>());
     static volatile Map<Integer,List<Long>> forWaitTimeCalculationFinal = Collections.synchronizedMap(new HashMap<>());
+    static volatile Map<Integer,List<Long>> forSyncDelayCalculation = Collections.synchronizedMap(new HashMap<>());
 
 
     public static void main(String[] args) {
@@ -290,10 +291,17 @@ public class deploy {
                             requestNumber++;
                             if(isCoordinator){
                                 forWaitTimeCalculation.put(PROCESSID,System.currentTimeMillis());
-                                if(requestNumber==5){
+                                if(requestNumber==10){
                                     //print stats
                                     System.out.printf("PROCESS ID  |   AVERAGE WAIT   |   ROUND WISE WAITS%n");
                                     for(Map.Entry<Integer,List<Long>> entry : forWaitTimeCalculationFinal.entrySet()){
+                                        System.out.printf("    %d              %s           %s%n"
+                                                ,entry.getKey()
+                                                ,Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble()
+                                                ,Arrays.toString(entry.getValue().toArray()));
+                                    }
+                                    System.out.printf("PROCESS ID  |   AVERAGE SYNC DELAY   |   ROUND WISE SYNC DELAY%n");
+                                    for(Map.Entry<Integer,List<Long>> entry : forSyncDelayCalculation.entrySet()){
                                         System.out.printf("    %d              %s           %s%n"
                                                 ,entry.getKey()
                                                 ,Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble()
@@ -341,17 +349,20 @@ public class deploy {
                                     llc_value++;
                                     //sendArray[n.getId() - 1]++;
                                     tokenBuilder = new StringBuilder();
+                                    Long time = System.currentTimeMillis();
                                     tokenBuilder.append(llc_value);tokenBuilder.append(",");
                                     tokenBuilder.append("token");tokenBuilder.append(",");
                                     tokenBuilder.append(PROCESSID);tokenBuilder.append(",");
                                     tokenBuilder.append(queueOfProcsVchWillReceiveTheTokenNext.peek());tokenBuilder.append(",");
                                     tokenBuilder.append(Arrays.toString(tokenArray).replace(",",":").replace(" ",""));tokenBuilder.append(",");
                                     tokenBuilder.append(queueOfProcsVchWillReceiveTheTokenNext.toString().replace(",",":").replace(" ",""));tokenBuilder.append(",");
-                                    tokenBuilder.append(System.currentTimeMillis());
+                                    tokenBuilder.append(time);
 
 
                                     if(isCoordinator){
                                         Long waitTime = System.currentTimeMillis() - forWaitTimeCalculation.get(queueOfProcsVchWillReceiveTheTokenNext.peek());
+                                        Long syncDelay = Math.abs(System.currentTimeMillis() - time + 10);
+
                                         if(!forWaitTimeCalculationFinal.containsKey(queueOfProcsVchWillReceiveTheTokenNext.peek())){
                                             List<Long> waitTimeHolder = new ArrayList<>();
                                             waitTimeHolder.add(waitTime);
@@ -360,6 +371,16 @@ public class deploy {
                                             List<Long> waitTimeHolder = forWaitTimeCalculationFinal.get(queueOfProcsVchWillReceiveTheTokenNext.peek());
                                             waitTimeHolder.add(waitTime);
                                             forWaitTimeCalculationFinal.put(queueOfProcsVchWillReceiveTheTokenNext.peek(),waitTimeHolder);
+                                        }
+
+                                        if(!forSyncDelayCalculation.containsKey(queueOfProcsVchWillReceiveTheTokenNext.peek())){
+                                            List<Long> syncDelayHolder = new ArrayList<>();
+                                            syncDelayHolder.add(syncDelay);
+                                            forSyncDelayCalculation.put(queueOfProcsVchWillReceiveTheTokenNext.peek(),syncDelayHolder);
+                                        } else {
+                                            List<Long> syncDelayHolder = forSyncDelayCalculation.get(queueOfProcsVchWillReceiveTheTokenNext.peek());
+                                            syncDelayHolder.add(syncDelay);
+                                            forSyncDelayCalculation.put(queueOfProcsVchWillReceiveTheTokenNext.peek(),syncDelayHolder);
                                         }
                                     }
                                     skValveSendToken.add(1);
@@ -473,6 +494,8 @@ public class deploy {
                                 if (parsedLine[1].equalsIgnoreCase("token")) {
                                     if(isCoordinator){
                                         Long waitTime = System.currentTimeMillis() - forWaitTimeCalculation.get(Integer.parseInt(parsedLine[3]));
+                                        Long syncDelay = Math.abs(System.currentTimeMillis() - Long.parseLong(parsedLine[6]));
+
                                         if(!forWaitTimeCalculationFinal.containsKey(Integer.parseInt(parsedLine[3]))){
                                             List<Long> waitTimeHolder = new ArrayList<>();
                                             waitTimeHolder.add(waitTime);
@@ -481,6 +504,16 @@ public class deploy {
                                             List<Long> waitTimeHolder = forWaitTimeCalculationFinal.get(Integer.parseInt(parsedLine[3]));
                                             waitTimeHolder.add(waitTime);
                                             forWaitTimeCalculationFinal.put(Integer.parseInt(parsedLine[3]),waitTimeHolder);
+                                        }
+
+                                        if(!forSyncDelayCalculation.containsKey(Integer.parseInt(parsedLine[3]))){
+                                            List<Long> syncDelayHolder = new ArrayList<>();
+                                            syncDelayHolder.add(syncDelay);
+                                            forSyncDelayCalculation.put(Integer.parseInt(parsedLine[3]),syncDelayHolder);
+                                        } else {
+                                            List<Long> syncDelayHolder = forSyncDelayCalculation.get(Integer.parseInt(parsedLine[3]));
+                                            syncDelayHolder.add(syncDelay);
+                                            forSyncDelayCalculation.put(Integer.parseInt(parsedLine[3]),syncDelayHolder);
                                         }
                                     }
                                     if(Integer.parseInt(parsedLine[3])==PROCESSID){
