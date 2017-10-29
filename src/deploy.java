@@ -51,6 +51,7 @@ public class deploy {
     static volatile BlockingQueue<Integer> skBlockingQueue ;
     static volatile int requestNumber = 0;
     static volatile CountDownLatch latch ;
+    static volatile CountDownLatch latchToTermination ;
     static volatile StringBuilder tokenBuilder;
     static volatile boolean terminate = false;
 
@@ -285,28 +286,43 @@ public class deploy {
                 while (true) {
                     if (canSendCSRequestAndTokens) {
 
+                        latch = new CountDownLatch(localNeighbourSet.size());
+                        latchToTermination = new CountDownLatch(localNeighbourSet.size());
+
                         if(!hasToken){
-                            latch = new CountDownLatch(localNeighbourSet.size());
                             llc_value++;
                             requestNumber++;
                             if(isCoordinator){
                                 forWaitTimeCalculation.put(PROCESSID,System.currentTimeMillis());
                                 if(requestNumber==10){
                                     //print stats
+                                    List<Double> avgwait = new ArrayList<>();
+                                    List<Double> avgsdel = new ArrayList<>();
+                                    System.out.println();
                                     System.out.printf("PROCESS ID  |   AVERAGE WAIT   |   ROUND WISE WAITS%n");
                                     for(Map.Entry<Integer,List<Long>> entry : forWaitTimeCalculationFinal.entrySet()){
-                                        System.out.printf("    %d              %s           %s%n"
+                                        System.out.printf("    %d              %.2f           %s%n"
                                                 ,entry.getKey()
                                                 ,Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble()
                                                 ,Arrays.toString(entry.getValue().toArray()));
+                                        avgwait.add(Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble());
                                     }
-                                    System.out.printf("PROCESS ID  |   AVERAGE SYNC DELAY   |   ROUND WISE SYNC DELAY%n");
+                                    System.out.println();
+                                    System.out.printf("PROCESS ID  |   AVERAGE SDEL   |   ROUND WISE SDELS%n");
                                     for(Map.Entry<Integer,List<Long>> entry : forSyncDelayCalculation.entrySet()){
-                                        System.out.printf("    %d              %s           %s%n"
+                                        System.out.printf("    %d              %.2f            %s%n"
                                                 ,entry.getKey()
                                                 ,Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble()
                                                 ,Arrays.toString(entry.getValue().toArray()));
+                                        avgsdel.add(Stream.of(entry.getValue().toArray(new Long[entry.getValue().size()])).mapToLong(i->i).average().getAsDouble());
                                     }
+                                    System.out.println();
+                                    System.out.println("======================================================");
+                                    System.out.printf("AVERAGE WAIT TIME : %.2f %s%n",avgwait.stream().mapToDouble(i->i).average().getAsDouble(),"ms");
+                                    System.out.printf("AVERAGE SYNC DELY : %.2f %s%n",avgsdel.stream().mapToDouble(i->i).average().getAsDouble(),"ms");
+                                    System.out.printf("AVERAGE NUMB MSGS : %.2f   %n",Double.valueOf(NUMBER_OF_PROCS));
+                                    System.out.println("======================================================");
+                                    System.out.println();
                                     terminate=true;
                                     break;
                                 }
@@ -323,13 +339,12 @@ public class deploy {
                         }
 
                         if(hasToken){
-                            latch = new CountDownLatch(localNeighbourSet.size());
                             if (!skBlockingQueue.isEmpty()) {
                                 skBlockingQueue.remove();
                                 try {
                                     llc_value++;
                                     System.out.printf("<%d> executing CS...%n",llc_value);
-                                    Thread.sleep(3000);
+                                    Thread.sleep(1000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
@@ -451,9 +466,13 @@ public class deploy {
 
                             if(terminate){
                                 out.println(llc_value + ",terminate," + PROCESSID);
-                                System.out.println("**************terminating processes");
+                                latchToTermination.countDown();
                                 break;
                             }
+                        }
+                        if(latchToTermination.getCount()==0){
+                            System.out.println("**************terminating processes");
+                            System.exit(0);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
