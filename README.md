@@ -4,7 +4,7 @@ This repo consists few of my multhreaded project pursuits.
 
 **Amongst the noticable are :**
 
-- **Distributed system with Chandy-Lamport snapshotting**
+- **Distributed system with Lamport clock and Chandy-Lamport snapshotting**
   - The [program](https://github.com/papillon88/Multithreading/blob/a70761c1572b6ec7fa6135a2908a3bdaac25d7c4/src/dproc.java) bootstraps a distributed system by reading a network configuration file [dsConfig](https://github.com/papillon88/Multithreading/blob/a70761c1572b6ec7fa6135a2908a3bdaac25d7c4/src/dsConfig). After the bootstrap, the coordinator initiates global snapshots based on Chandy-Lamport algo at <INTERVAL> values till <TERMINATION> value. All local state infos are recorded in a file named "localstate_x" where x is the PID assigned to nodes by the coordinator. The program ends gracefully with properly recorded local and channel states.  
     The dsConfig consists of the following parameters :
     - COORDINATOR net01.utdallas.edu --> hostname of the machine that acts as the coordinator in the DS
