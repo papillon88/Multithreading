@@ -11,7 +11,7 @@ public class threePC {
 
     private static final int NUMBER_OF_PROCS = 3;
 
-    private static final int PORT = 5001;
+    private static final int PORT = 5000;
     private static final String ADDRESS = "net01.utdallas.edu";
 
 
@@ -21,14 +21,16 @@ public class threePC {
     private static volatile AtomicInteger numberOfProcsWrittenTo = new AtomicInteger(0);
     private static volatile AtomicInteger numberOfAcksToComReq = new AtomicInteger(0);
     private static volatile AtomicInteger numberOfAcksToPrepareCom = new AtomicInteger(0);
-    private static volatile AtomicInteger numberOfAcksToCom = new AtomicInteger(0);
+    private static volatile AtomicInteger numberOfAcksToActualCom = new AtomicInteger(0);
+
 
     private static volatile boolean write = false;
     private static volatile boolean commitReq = false;
     private static volatile boolean prepareComm = false;
+    private static volatile boolean actualComm = false;
     private static volatile StringBuilder valueToBeWritten;
-
-
+    private static volatile BufferedWriter stateWriter;
+    private static int commitableVal;
 
 
     public static void main(String[] args) {
@@ -44,6 +46,7 @@ public class threePC {
                             else
                                 continue;
                         }
+
                         System.out.println("*************COHORT REGISTRATION COMPLETE");
 
                         valueToBeWritten = new StringBuilder();
@@ -82,13 +85,14 @@ public class threePC {
                         write=true;
 
                         while(true){
-                            if(numberOfAcksToCom.get()==NUMBER_OF_PROCS)
+                            if(numberOfAcksToActualCom.get()==NUMBER_OF_PROCS)
                                 break;
                             else
                                 continue;
                         }
 
                         System.out.println("*************COHORT COMMIT COMPLETE");
+                        System.exit(0);
 
                     });
                     coordinatorEngineThread.start();
@@ -122,6 +126,11 @@ public class threePC {
                                                 if(parsedLine[0].equalsIgnoreCase("apcm")){
                                                     System.out.println("ack to prepare comm received from : "+parsedLine[1]);
                                                     numberOfAcksToPrepareCom.incrementAndGet();
+                                                }
+
+                                                if(parsedLine[0].equalsIgnoreCase("acom")){
+                                                    System.out.println("ack to actual comm received from : "+parsedLine[1]);
+                                                    numberOfAcksToActualCom.incrementAndGet();
                                                 }
 
                                             }
@@ -174,23 +183,44 @@ public class threePC {
                 Thread clientThreadMain = new Thread(() -> {
 
                     Thread cohortEngine = new Thread(()->{
+
+                        File file = new File("state_file_"+args[0]);
+                        if(!file.exists()){
+                            createFileAndWriter(file);
+                        } else {
+                            loadFileAndWriter(file);
+                        }
+
+                        persistStateToFile(stateWriter,"q");
+
                         while (true){
                             if(commitReq)
                                 break;
                         }
 
-                        valueToBeWritten = new StringBuilder();
-                        valueToBeWritten.append("ACRQ;"+args[0]);
-                        write=true;
+                        persistStateToFile(stateWriter,"w");
+
+                        prepareToWriteToCoordinator("ACRQ;"+args[0]);
 
                         while (true){
                             if(prepareComm)
                                 break;
                         }
 
-                        valueToBeWritten = new StringBuilder();
-                        valueToBeWritten.append("APCM;"+args[0]);
-                        write=true;
+                        persistStateToFile(stateWriter,"p");
+
+                        prepareToWriteToCoordinator("APCM;"+args[0]);
+
+                        while (true){
+                            if(actualComm)
+                                break;
+                        }
+
+                        persistStateToFile(stateWriter,String.valueOf(commitableVal));
+
+                        prepareToWriteToCoordinator("ACOM;"+args[0]);
+
+                        System.exit(0);
 
                     });
                     cohortEngine.start();
@@ -217,6 +247,8 @@ public class threePC {
 
                                     if(parsedLine[0].equalsIgnoreCase("com")){
                                         System.out.println("committing value  "+parsedLine[1]);
+                                        commitableVal = Integer.parseInt(parsedLine[1]);
+                                        actualComm = true;
                                     }
                                 }
                             } catch (IOException e) {
@@ -255,6 +287,40 @@ public class threePC {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    private static void prepareToWriteToCoordinator(String message) {
+        valueToBeWritten = new StringBuilder();
+        valueToBeWritten.append(message);
+        write=true;
+    }
+
+    private static void loadFileAndWriter(File file) {
+        //load file
+        try {
+            stateWriter = new BufferedWriter(new FileWriter(file.getName(),true));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void createFileAndWriter(File file) {
+        try {
+            file.createNewFile();
+            stateWriter = new BufferedWriter(new FileWriter(file.getName(),true));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void persistStateToFile(BufferedWriter stateWriter, String state) {
+        try {
+            stateWriter.write(state);
+            stateWriter.newLine();
+            stateWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
