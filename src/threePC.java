@@ -12,7 +12,7 @@ public class threePC {
 
     private static final int NUMBER_OF_PROCS = 3;
 
-    private static final int PORT = 5001;
+    private static final int PORT = 5000;
     private static final String ADDRESS = "net01.utdallas.edu";
 
     private static volatile AtomicInteger numberOfRegCohorts = new AtomicInteger(0);
@@ -77,6 +77,7 @@ public class threePC {
                             if(numberOfAcksToComReq.get()==NUMBER_OF_PROCS){
                                 //System.out.println("got 3 acks to comm reqs");
                                 transactionAborted = false;
+                                timeOutTimer = 0;
                                 break;
                             } else {
                                 if(timeOutTimer == 10){
@@ -84,6 +85,7 @@ public class threePC {
                                     transactionAborted = true;
                                     numberOfAcksToComReq.set(0);
                                     //System.out.println("time out : setting numberofackstocommreq to 0"+numberOfAcksToComReq.get());
+
                                     valueToBeWritten = new StringBuilder();
                                     valueToBeWritten.append("ABT");valueToBeWritten.append(";");
                                     write=true;
@@ -111,6 +113,7 @@ public class threePC {
                             }
                             if(numberOfAcksToPrepareCom.get()==NUMBER_OF_PROCS){
                                 transactionAborted = false;
+                                timeOutTimer = 0;
                                 break;
                             } else {
                                 if(timeOutTimer == 10){
@@ -118,6 +121,7 @@ public class threePC {
                                     transactionAborted = true;
                                     numberOfAcksToComReq.set(0);
                                     numberOfAcksToPrepareCom.set(0);
+
                                     valueToBeWritten = new StringBuilder();
                                     valueToBeWritten.append("ABT");valueToBeWritten.append(";");
                                     write=true;
@@ -344,6 +348,11 @@ public class threePC {
                                 break;
                         }prepareComm = false;
 
+                        if(testCase == 2 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
+                            System.out.println(args[0]+" fails");
+                            System.exit(0);
+                        }
+
                         if(!abort){
                             persistStateToFile(stateWriter,"p "+String.valueOf(commitableVal)+" "+String.valueOf(transactionId));
                             System.out.println("persisting P to state file");
@@ -516,6 +525,15 @@ public class threePC {
             }
             String[] checkPoint = list.get(list.size() - 1).split(" ");
             if(checkPoint[0].equalsIgnoreCase("q")){
+                commitableVal = Integer.parseInt(checkPoint[1]);
+                transactionId = Integer.parseInt(checkPoint[2]);
+                commitReq = true;
+                prepareComm = true;
+                actualComm = true;
+                suppliedProcessToFail = "tamarind";
+                abort = true;
+            }
+            if(checkPoint[0].equalsIgnoreCase("w")){
                 commitableVal = Integer.parseInt(checkPoint[1]);
                 transactionId = Integer.parseInt(checkPoint[2]);
                 commitReq = true;
