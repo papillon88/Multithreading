@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class threePC {
 
-    private static final int NUMBER_OF_PROCS = 3;
+    private static final int NUMBER_OF_PROCS = 4;
 
     private static final int PORT = 5000;
     private static final String ADDRESS = "net01.utdallas.edu";
@@ -43,7 +43,7 @@ public class threePC {
     public static void main(String[] args) {
 
         if (args.length != 0) {
-            if (args[0].equalsIgnoreCase("-c")) {
+            if (args[0].equalsIgnoreCase("co")) {
 
                 Thread coordinatorProcessorThread = new Thread(() -> {
                     while(true){
@@ -59,6 +59,8 @@ public class threePC {
                         Scanner scanner = new Scanner(System.in);
                         System.out.print("Commit value : ");
                         String[] scannedVal = scanner.nextLine().split(" ");
+                        suppliedProcessToFail = scannedVal[2];
+                        testCase = Integer.valueOf(scannedVal[1]);
 
                         valueToBeWritten = new StringBuilder();
                         valueToBeWritten.append("CRQ");valueToBeWritten.append(";");
@@ -101,6 +103,12 @@ public class threePC {
 
                         System.out.println("*************COHORT COMMIT REQ COMPLETE");
 
+                        //coordinator fails after W state but before P state
+                        if(testCase == 3 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
+                            System.out.println(args[0]+" fails");
+                            System.exit(0);
+                        }
+
                         valueToBeWritten = new StringBuilder();
                         valueToBeWritten.append("PCM");valueToBeWritten.append(";");
                         write=true;
@@ -138,8 +146,13 @@ public class threePC {
 
                         System.out.println("*************COHORT PREPARE COMMIT COMPLETE");
 
+                        //coordinator fails after P state but before C state
                         //if coordinator doesnt send a commit here, fails, or times out at this point, the cohorts commit anyway
                         //after their timeouttimes expires as they are already in the prepared state !
+                        if(testCase == 4 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
+                            System.out.println(args[0]+" fails");
+                            System.exit(0);
+                        }
 
                         valueToBeWritten = new StringBuilder();
                         valueToBeWritten.append("COM");valueToBeWritten.append(";");
@@ -343,9 +356,28 @@ public class threePC {
                             write = true;
                         }
 
-                        while (true){
-                            if(prepareComm)
+                        while(true){
+                            try {
+                                Thread.sleep(300);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            if(prepareComm){
+                                timeOutTimer = 0;
                                 break;
+                            } else {
+                                if(timeOutTimer == 10){
+                                    timeOutTimer = 0;
+                                    System.out.println("time out ...");
+                                    System.out.println("aborting now ...");
+                                    actualComm = true;
+                                    abort = true;
+                                    break;
+                                } else {
+                                    timeOutTimer++;
+                                    System.out.println("waiting for prepare commit from coordinator ..."+timeOutTimer);
+                                }
+                            }
                         }prepareComm = false;
 
                         if(testCase == 2 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
@@ -363,9 +395,26 @@ public class threePC {
                             write = true;
                         }
 
-                        while (true){
-                            if(actualComm)
+                        while(true){
+                            try {
+                                Thread.sleep(300);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            if(actualComm){
+                                timeOutTimer = 0;
                                 break;
+                            } else {
+                                if(timeOutTimer == 10){
+                                    timeOutTimer = 0;
+                                    System.out.println("time out ...");
+                                    System.out.println("commit now ...");
+                                    break;
+                                } else {
+                                    timeOutTimer++;
+                                    System.out.println("waiting for actual commit from coordinator ..."+timeOutTimer);
+                                }
+                            }
                         }actualComm = false;
 
                         if(!abort) {
