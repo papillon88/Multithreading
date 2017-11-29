@@ -330,6 +330,7 @@ public class threePC {
                             loadFileAndWriter(file);
                         }
 
+                        //a wait timer for commit request message from coordinator
                         while (true){
                             if(commitReq){
                                 if(!abort){
@@ -340,6 +341,7 @@ public class threePC {
                             }
                         }commitReq = false;
 
+                        //cohort fails after Q but before W. On recovery, cohort aborts the transaction.
                         if(testCase == 1 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
                             System.out.println(args[0]+" fails");
                             System.exit(0);
@@ -356,6 +358,7 @@ public class threePC {
                             write = true;
                         }
 
+                        //a wait timer for prepare commit message from coordinator
                         while(true){
                             try {
                                 Thread.sleep(300);
@@ -380,6 +383,8 @@ public class threePC {
                             }
                         }prepareComm = false;
 
+
+                        //cohort fails after W but before P. On recovery, cohort aborts the transaction.
                         if(testCase == 2 & suppliedProcessToFail.equalsIgnoreCase(args[0])){
                             System.out.println(args[0]+" fails");
                             System.exit(0);
@@ -395,6 +400,7 @@ public class threePC {
                             write = true;
                         }
 
+                        //a wait timer for actual commit message from coordinator
                         while(true){
                             try {
                                 Thread.sleep(300);
